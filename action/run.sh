@@ -1,0 +1,254 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Resolve script directory and action root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ACTION_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+# Source helper scripts
+# shellcheck source=action/comment.sh
+source "${SCRIPT_DIR}/comment.sh"
+# shellcheck source=action/workspace.sh
+source "${SCRIPT_DIR}/workspace.sh"
+# shellcheck source=action/build.sh
+source "${SCRIPT_DIR}/build.sh"
+
+BUNDLE_STATS="node ${ACTION_ROOT}/bin/bundle-stats.ts"
+
+# --- 1. Resolve inputs ---
+
+# PR number from event JSON
+PR_NUMBER="${PR_NUMBER:-}"
+if [[ -z "$PR_NUMBER" ]] && [[ -n "${GITHUB_EVENT_PATH:-}" ]]; then
+  PR_NUMBER="$(node --input-type=module -e "
+    import {readFileSync} from 'node:fs';
+    const event = JSON.parse(readFileSync('${GITHUB_EVENT_PATH}', 'utf-8'));
+    process.stdout.write(String(event.pull_request?.number || event.number || ''));
+  ")"
+fi
+
+# Base ref
+BASE_REF="${INPUT_BASE_REF:-}"
+if [[ -z "$BASE_REF" ]] && [[ -n "${GITHUB_EVENT_PATH:-}" ]]; then
+  BASE_REF="$(node --input-type=module -e "
+    import {readFileSync} from 'node:fs';
+    const event = JSON.parse(readFileSync('${GITHUB_EVENT_PATH}', 'utf-8'));
+    process.stdout.write(event.pull_request?.base?.sha || '');
+  ")"
+fi
+
+# Head ref
+HEAD_REF="${INPUT_HEAD_REF:-${GITHUB_SHA:-}}"
+
+if [[ -z "$PR_NUMBER" ]]; then
+  echo "Error: Could not determine PR number. Is this running on a pull_request event?" >&2
+  exit 1
+fi
+
+if [[ -z "$BASE_REF" ]]; then
+  echo "Error: Could not determine base ref. Set base-ref input or run on a pull_request event." >&2
+  exit 1
+fi
+
+if [[ -z "$HEAD_REF" ]]; then
+  echo "Error: Could not determine head ref." >&2
+  exit 1
+fi
+
+echo "PR #${PR_NUMBER}: comparing ${BASE_REF:0:8}..${HEAD_REF:0:8}"
+
+# --- 2. Resolve packages ---
+
+PACKAGE_PATHS="$(resolve_packages "${INPUT_PACKAGES:-.}")"
+
+# Build display list of package names
+PKG_DISPLAY=""
+while IFS= read -r pkg_path; do
+  [[ -z "$pkg_path" ]] && continue
+  local_name="$(node --input-type=module -e "
+    import {readFileSync} from 'node:fs';
+    const pkg = JSON.parse(readFileSync('${pkg_path}/package.json', 'utf-8'));
+    process.stdout.write(pkg.name || '${pkg_path}');
+  ")"
+  if [[ -n "$PKG_DISPLAY" ]]; then
+    PKG_DISPLAY="${PKG_DISPLAY}, ${local_name}"
+  else
+    PKG_DISPLAY="${local_name}"
+  fi
+done <<< "$PACKAGE_PATHS"
+
+echo "Packages: ${PKG_DISPLAY}"
+
+# --- 3. Post calculating comment ---
+
+post_calculating "$PKG_DISPLAY"
+
+# --- 4. Error trap ---
+
+ERROR_FILE="$(mktemp)"
+cleanup() {
+  rm -f "$ERROR_FILE"
+}
+trap cleanup EXIT
+
+on_error() {
+  local error_output
+  error_output="$(cat "$ERROR_FILE" 2>/dev/null || echo 'Unknown error')"
+  post_error "$error_output"
+  cleanup
+  exit 1
+}
+trap on_error ERR
+
+# --- 5. Build CLI flags ---
+
+CLI_FLAGS=""
+if [[ "${INPUT_NO_BENCHMARK:-false}" == "true" ]]; then
+  CLI_FLAGS="${CLI_FLAGS} --no-benchmark"
+fi
+if [[ "${INPUT_NO_BUNDLE:-false}" == "true" ]]; then
+  CLI_FLAGS="${CLI_FLAGS} --no-bundle"
+fi
+
+# Handle comma-separated ignore patterns
+if [[ -n "${INPUT_IGNORE:-}" ]]; then
+  IFS=',' read -ra IGNORE_PATTERNS <<< "$INPUT_IGNORE"
+  for pattern in "${IGNORE_PATTERNS[@]}"; do
+    pattern="$(echo "$pattern" | xargs)"
+    if [[ -n "$pattern" ]]; then
+      CLI_FLAGS="${CLI_FLAGS} --ignore ${pattern}"
+    fi
+  done
+fi
+
+# Handle comma-separated only patterns
+if [[ -n "${INPUT_ONLY:-}" ]]; then
+  IFS=',' read -ra ONLY_PATTERNS <<< "$INPUT_ONLY"
+  for pattern in "${ONLY_PATTERNS[@]}"; do
+    pattern="$(echo "$pattern" | xargs)"
+    if [[ -n "$pattern" ]]; then
+      CLI_FLAGS="${CLI_FLAGS} --only ${pattern}"
+    fi
+  done
+fi
+
+# --- Helper: convert package path to a safe slug for filenames ---
+
+path_to_slug() {
+  echo "$1" | tr '@/' '__'
+}
+
+# --- 6. Measure baseline ---
+
+echo "Checking out baseline: ${BASE_REF}"
+git checkout "$BASE_REF" 2>"$ERROR_FILE"
+
+run_builds "$PACKAGE_PATHS" 2>>"$ERROR_FILE"
+
+while IFS= read -r pkg_path; do
+  [[ -z "$pkg_path" ]] && continue
+  slug="$(path_to_slug "$pkg_path")"
+  echo "Measuring baseline for ${pkg_path}..."
+  eval "${BUNDLE_STATS} --package ${pkg_path} --format json ${CLI_FLAGS}" > "/tmp/baseline-${slug}.json" 2>>"$ERROR_FILE"
+done <<< "$PACKAGE_PATHS"
+
+echo "Checking out head: ${HEAD_REF}"
+git checkout "$HEAD_REF" 2>>"$ERROR_FILE"
+
+# --- 7. Measure current ---
+
+run_builds "$PACKAGE_PATHS" 2>>"$ERROR_FILE"
+
+while IFS= read -r pkg_path; do
+  [[ -z "$pkg_path" ]] && continue
+  slug="$(path_to_slug "$pkg_path")"
+  echo "Measuring current for ${pkg_path}..."
+  eval "${BUNDLE_STATS} --package ${pkg_path} --format json ${CLI_FLAGS}" > "/tmp/current-${slug}.json" 2>>"$ERROR_FILE"
+done <<< "$PACKAGE_PATHS"
+
+# --- 8. Generate comparison markdown ---
+
+MARKDOWN=""
+
+while IFS= read -r pkg_path; do
+  [[ -z "$pkg_path" ]] && continue
+  slug="$(path_to_slug "$pkg_path")"
+  echo "Generating comparison for ${pkg_path}..."
+  pkg_md="$(cat "/tmp/baseline-${slug}.json" | eval "${BUNDLE_STATS} --package ${pkg_path} --format markdown --compare - ${CLI_FLAGS}" 2>>"$ERROR_FILE")"
+
+  if [[ -n "$MARKDOWN" ]]; then
+    MARKDOWN="${MARKDOWN}
+
+${pkg_md}"
+  else
+    MARKDOWN="${pkg_md}"
+  fi
+done <<< "$PACKAGE_PATHS"
+
+# --- 9. Check thresholds ---
+
+THRESHOLD_ARGS=""
+
+if [[ -n "${INPUT_MAX_IMPORT_TIME:-}" ]]; then
+  THRESHOLD_ARGS="${THRESHOLD_ARGS} --max-import-time ${INPUT_MAX_IMPORT_TIME}"
+fi
+if [[ -n "${INPUT_MAX_BUNDLE_SIZE_GZIP:-}" ]]; then
+  THRESHOLD_ARGS="${THRESHOLD_ARGS} --max-bundle-size-gzip ${INPUT_MAX_BUNDLE_SIZE_GZIP}"
+fi
+if [[ -n "${INPUT_MAX_BUNDLE_SIZE_RAW:-}" ]]; then
+  THRESHOLD_ARGS="${THRESHOLD_ARGS} --max-bundle-size-raw ${INPUT_MAX_BUNDLE_SIZE_RAW}"
+fi
+if [[ -n "${INPUT_MAX_INTERNAL_SIZE_GZIP:-}" ]]; then
+  THRESHOLD_ARGS="${THRESHOLD_ARGS} --max-internal-size-gzip ${INPUT_MAX_INTERNAL_SIZE_GZIP}"
+fi
+if [[ -n "${INPUT_MAX_INTERNAL_SIZE_RAW:-}" ]]; then
+  THRESHOLD_ARGS="${THRESHOLD_ARGS} --max-internal-size-raw ${INPUT_MAX_INTERNAL_SIZE_RAW}"
+fi
+
+# Build --report args for each package
+REPORT_ARGS=""
+while IFS= read -r pkg_path; do
+  [[ -z "$pkg_path" ]] && continue
+  slug="$(path_to_slug "$pkg_path")"
+  pkg_name="$(node --input-type=module -e "
+    import {readFileSync} from 'node:fs';
+    const pkg = JSON.parse(readFileSync('${pkg_path}/package.json', 'utf-8'));
+    process.stdout.write(pkg.name || '${pkg_path}');
+  ")"
+  REPORT_ARGS="${REPORT_ARGS} --report ${pkg_name}:/tmp/current-${slug}.json"
+done <<< "$PACKAGE_PATHS"
+
+VIOLATIONS_MD=""
+THRESHOLD_EXIT=0
+
+if [[ -n "$THRESHOLD_ARGS" ]]; then
+  VIOLATIONS_MD="$(node "${ACTION_ROOT}/action/check-thresholds.ts" ${REPORT_ARGS} ${THRESHOLD_ARGS} 2>>"$ERROR_FILE")" || THRESHOLD_EXIT=$?
+
+  # Exit code 2 means invalid args — treat as error
+  if [[ "$THRESHOLD_EXIT" -eq 2 ]]; then
+    post_error "$(cat "$ERROR_FILE" 2>/dev/null || echo 'Threshold check failed with invalid arguments')"
+    exit 1
+  fi
+fi
+
+# --- 10. Update comment ---
+
+FINAL_BODY="$MARKDOWN"
+if [[ -n "$VIOLATIONS_MD" ]]; then
+  FINAL_BODY="${FINAL_BODY}
+
+${VIOLATIONS_MD}"
+fi
+
+# Reset error trap before final comment — we handle failure ourselves now
+trap cleanup EXIT
+trap - ERR
+
+upsert_comment "$FINAL_BODY"
+
+if [[ "$THRESHOLD_EXIT" -eq 1 ]]; then
+  echo "Threshold violations detected — failing the check."
+  exit 1
+fi
+
+echo "Bundle stats complete."
