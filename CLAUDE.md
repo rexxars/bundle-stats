@@ -21,11 +21,13 @@ pnpm test               # Run all tests (node --test)
 ```
 
 Run a single test file:
+
 ```bash
 node --test src/thresholds.test.ts
 ```
 
 Run from source without building (Node 24 runs TS natively):
+
 ```bash
 node bin/bundle-stats.ts --help
 node bin/bundle-stats.ts --package /path/to/pkg --no-bundle --no-benchmark
@@ -44,6 +46,7 @@ The CLI (`src/cli.ts`) is a thin wrapper around `generateReport()` in `src/index
 3. **Import time** (`src/measure/imports.ts`) — median cold-start `import()` in a sandboxed child process
 
 Key modules:
+
 - `src/exports.ts` — reads `package.json` exports field, discovers entry points
 - `src/compare.ts` — generates delta reports between two measurement runs
 - `src/format/` — three formatters: `cli.ts` (terminal tables), `markdown.ts`, `json.ts`
@@ -54,6 +57,7 @@ Key modules:
 ### GitHub Action (`action/`)
 
 Composite action defined in `action.yml` with shell scripts:
+
 - `action/run.sh` — main orchestrator: resolves packages, posts calculating comment, checks out base→build→measure, then head→build→measure, generates comparison, checks thresholds, upserts final comment
 - `action/comment.sh` — PR comment CRUD via `gh api` using `<!-- bundle-stats-comment -->` HTML marker
 - `action/workspace.sh` — PM detection (pnpm/yarn/npm via lock files), workspace resolution

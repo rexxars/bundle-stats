@@ -114,22 +114,22 @@ The action automatically checks out the PR base, builds, measures, then does the
 
 ### Action Inputs
 
-| Input | Default | Description |
-|-------|---------|-------------|
-| `packages` | `.` | Comma-separated package names (resolved via workspaces) or paths |
-| `build-script` | `build` | npm script to run per-package via PM filter syntax |
-| `build-command` | | Global build command (overrides per-package builds, for turbo/nx) |
-| `base-ref` | PR base SHA | Git ref for baseline measurement |
-| `head-ref` | Current SHA | Git ref for current measurement |
-| `max-import-time` | | Max import time per export (e.g. `500ms`) |
-| `max-bundle-size-gzip` | | Max gzip bundle size per export (e.g. `100kb`) |
-| `max-bundle-size-raw` | | Max raw bundle size per export (e.g. `500kb`) |
-| `max-internal-size-gzip` | | Max gzip internal size per export (e.g. `50kb`) |
-| `max-internal-size-raw` | | Max raw internal size per export (e.g. `200kb`) |
-| `ignore` | | Comma-separated glob patterns to skip exports |
-| `only` | | Comma-separated glob patterns for exports to include |
-| `no-benchmark` | `false` | Skip import time benchmarks |
-| `no-bundle` | `false` | Skip Rollup bundling |
+| Input                    | Default     | Description                                                       |
+| ------------------------ | ----------- | ----------------------------------------------------------------- |
+| `packages`               | `.`         | Comma-separated package names (resolved via workspaces) or paths  |
+| `build-script`           | `build`     | npm script to run per-package via PM filter syntax                |
+| `build-command`          |             | Global build command (overrides per-package builds, for turbo/nx) |
+| `base-ref`               | PR base SHA | Git ref for baseline measurement                                  |
+| `head-ref`               | Current SHA | Git ref for current measurement                                   |
+| `max-import-time`        |             | Max import time per export (e.g. `500ms`)                         |
+| `max-bundle-size-gzip`   |             | Max gzip bundle size per export (e.g. `100kb`)                    |
+| `max-bundle-size-raw`    |             | Max raw bundle size per export (e.g. `500kb`)                     |
+| `max-internal-size-gzip` |             | Max gzip internal size per export (e.g. `50kb`)                   |
+| `max-internal-size-raw`  |             | Max raw internal size per export (e.g. `200kb`)                   |
+| `ignore`                 |             | Comma-separated glob patterns to skip exports                     |
+| `only`                   |             | Comma-separated glob patterns for exports to include              |
+| `no-benchmark`           | `false`     | Skip import time benchmarks                                       |
+| `no-bundle`              | `false`     | Skip Rollup bundling                                              |
 
 ## Manual CI Usage
 
