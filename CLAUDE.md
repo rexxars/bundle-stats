@@ -2,60 +2,70 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-## Project
+## Overview
 
-@sanity-labs/bundle-stats — CLI tool and library that measures bundle sizes, bundled-with-deps sizes, and import times for npm package exports. Generates reports in terminal, Markdown, and JSON formats with optional baseline comparison for CI delta tracking.
+`@sanity-labs/bundle-stats` measures bundle sizes, bundled-with-deps sizes, and import times for npm package exports. It outputs reports as terminal tables, Markdown, or JSON, and can compare against a baseline to show deltas. Designed for CI workflows that post PR comments with size regressions.
 
-Requires **Node.js 24+**. Uses pnpm as package manager. ESM-only (`"type": "module"`).
+Includes a colocated composite GitHub Action (`action.yml` + `action/`) that automates before/after comparison on PRs with comment lifecycle management.
 
 ## Commands
 
 ```bash
-pnpm build            # Compile to dist/ with tsup
-pnpm check:types      # Type-check with tsc --noEmit
-pnpm lint             # ESLint
-pnpm lint:fix         # ESLint with auto-fix
-pnpm check:format     # Prettier check
-pnpm format           # Prettier write
+pnpm build              # Compile to dist/ with tsup
+pnpm check:types        # Type-check with tsc --noEmit
+pnpm lint               # ESLint
+pnpm lint:fix           # ESLint with auto-fix
+pnpm check:format       # Prettier check
+pnpm format             # Prettier write
+pnpm test               # Run all tests (node --test)
 ```
 
-No test suite exists yet. No compilation needed during development — Node 24 runs TypeScript natively:
+Run a single test file:
+```bash
+node --test src/thresholds.test.ts
+```
 
+Run from source without building (Node 24 runs TS natively):
 ```bash
 node bin/bundle-stats.ts --help
 node bin/bundle-stats.ts --package /path/to/pkg --no-bundle --no-benchmark
 ```
 
-Build is only needed for publishing. `bin/bundle-stats.js` imports from `dist/`, while `bin/bundle-stats.ts` imports from `src/` directly.
+Build is only needed for publishing — `bin/bundle-stats.js` imports from `dist/`, while `bin/bundle-stats.ts` imports from `src/` directly.
 
 ## Architecture
 
-The pipeline has four stages: **discover → measure → compare → format**.
+### Core pipeline (`src/`)
 
-### Discover (src/exports.ts)
-Reads `exports` field from target package.json, resolves conditional exports to the `"default"` condition, and filters by `--ignore`/`--only` glob patterns.
+The CLI (`src/cli.ts`) is a thin wrapper around `generateReport()` in `src/index.ts`, which orchestrates three measurement passes per export entry:
 
-### Measure (src/measure/)
-Three independent measurement passes per export:
-- **sizes.ts** — Internal size: walks relative imports via regex, sums file sizes, gzips
-- **bundle.ts** — Bundled size: Rollup bundles with all non-peer deps, generates treemap HTML via rollup-plugin-visualizer
-- **imports.ts** — Import time: spawns sandboxed Node child process (using Node 24 `--permission` flag), runs 10 imports, trims outliers, returns median. Handles both standalone packages and monorepos (detects pnpm-workspace.yaml / package.json workspaces)
+1. **Internal size** (`src/measure/sizes.ts`) — own source code reachable from the export (raw + gzip)
+2. **Bundled size** (`src/measure/bundle.ts`) — Rollup bundle with all non-peer deps inlined, plus interactive treemap HTML
+3. **Import time** (`src/measure/imports.ts`) — median cold-start `import()` in a sandboxed child process
 
-### Compare (src/compare.ts)
-Diffs current vs baseline report, producing per-export deltas with before/after/delta/percent for each metric.
+Key modules:
+- `src/exports.ts` — reads `package.json` exports field, discovers entry points
+- `src/compare.ts` — generates delta reports between two measurement runs
+- `src/format/` — three formatters: `cli.ts` (terminal tables), `markdown.ts`, `json.ts`
+- `src/thresholds.ts` — parses human-readable values (`"500ms"`, `"100kb"`), evaluates thresholds against reports, formats violations as Markdown
+- `src/types.ts` — all shared TypeScript interfaces (`Report`, `ExportReport`, `ExportDelta`, etc.)
+- `src/glob.ts` — glob-to-regex for `--ignore` / `--only` patterns
 
-### Format (src/format/)
-- **cli.ts** — ANSI-colored terminal table
-- **markdown.ts** — GitHub-flavored Markdown table for PR comments
-- **json.ts** — Pretty-printed JSON
+### GitHub Action (`action/`)
 
-### Entry points
-- **src/index.ts** — Library API: `generateReport()`, `compareReports()`, formatters
-- **src/cli.ts** — CLI arg parsing via `util.parseArgs`, orchestrates the pipeline
-- **src/types.ts** — All TypeScript type definitions (Report, ExportReport, ComparisonReport, etc.)
+Composite action defined in `action.yml` with shell scripts:
+- `action/run.sh` — main orchestrator: resolves packages, posts calculating comment, checks out base→build→measure, then head→build→measure, generates comparison, checks thresholds, upserts final comment
+- `action/comment.sh` — PR comment CRUD via `gh api` using `<!-- bundle-stats-comment -->` HTML marker
+- `action/workspace.sh` — PM detection (pnpm/yarn/npm via lock files), workspace resolution
+- `action/build.sh` — per-package builds via PM filter syntax, or global build command override
+- `action/check-thresholds.ts` — standalone CLI that imports from `src/thresholds.ts` to evaluate threshold violations
 
-## Code Style
+## Conventions
 
-- No semicolons, single quotes, no bracket spacing, 100 char line width (Prettier)
-- `@typescript-eslint/no-explicit-any` is allowed
-- Target: ESNext, strict mode, bundler module resolution
+- ESM-only (`"type": "module"` in package.json)
+- Node.js 24+ required (uses native TS execution, `fs.globSync`, `node:test`)
+- Tests use `node:test` and `node:assert/strict` — no external test framework
+- TypeScript uses `.ts` extensions in imports (`from './types.ts'`)
+- `tsconfig.json` uses `erasableSyntaxOnly: true` and `allowImportingTsExtensions: true` for Node 24 native TS
+- pnpm as package manager
+- Release via `semantic-release` with `@sanity/semantic-release-preset`
