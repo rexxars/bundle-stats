@@ -78,9 +78,62 @@ The tool reads the `exports` field in your `package.json` and runs three measure
 | **Bundled size**  | Rollup bundle with all non-peer dependencies inlined (raw + gzip), plus an interactive treemap HTML |
 | **Import time**   | Median cold-start `import()` time in a sandboxed Node.js child process (10 runs, outliers trimmed)  |
 
-## CI Usage
+## GitHub Action
 
-Add as a dev dependency and call it from your workflow. Example for GitHub Actions:
+The easiest way to use bundle-stats in CI. Add to your workflow:
+
+```yaml
+name: Bundle Stats
+on:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  bundle-stats:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - uses: sanity-io/bundle-stats@v1
+        with:
+          packages: 'sanity, @sanity/vision'
+          max-import-time: 500ms
+          max-bundle-size-gzip: 100kb
+```
+
+The action automatically checks out the PR base, builds, measures, then does the same for the PR head, and posts a comparison comment on the PR. If thresholds are exceeded, the check fails.
+
+### Action Inputs
+
+| Input | Default | Description |
+|-------|---------|-------------|
+| `packages` | `.` | Comma-separated package names (resolved via workspaces) or paths |
+| `build-script` | `build` | npm script to run per-package via PM filter syntax |
+| `build-command` | | Global build command (overrides per-package builds, for turbo/nx) |
+| `base-ref` | PR base SHA | Git ref for baseline measurement |
+| `head-ref` | Current SHA | Git ref for current measurement |
+| `max-import-time` | | Max import time per export (e.g. `500ms`) |
+| `max-bundle-size-gzip` | | Max gzip bundle size per export (e.g. `100kb`) |
+| `max-bundle-size-raw` | | Max raw bundle size per export (e.g. `500kb`) |
+| `max-internal-size-gzip` | | Max gzip internal size per export (e.g. `50kb`) |
+| `max-internal-size-raw` | | Max raw internal size per export (e.g. `200kb`) |
+| `ignore` | | Comma-separated glob patterns to skip exports |
+| `only` | | Comma-separated glob patterns for exports to include |
+| `no-benchmark` | `false` | Skip import time benchmarks |
+| `no-bundle` | `false` | Skip Rollup bundling |
+
+## Manual CI Usage
+
+For more control, call the CLI directly from your workflow steps:
 
 ```yaml
 env:
@@ -90,14 +143,14 @@ steps:
   # ... build steps ...
 
   - name: Generate baseline report
-    run: $BUNDLE_STATS report --package packages/my-lib --no-benchmark --format json > /tmp/baseline.json
+    run: $BUNDLE_STATS --package packages/my-lib --no-benchmark --format json > /tmp/baseline.json
 
   # ... rebuild after changes ...
 
   - name: Generate comparison report
     run: |
       cat /tmp/baseline.json | \
-        $BUNDLE_STATS report --package packages/my-lib --format markdown --compare - \
+        $BUNDLE_STATS --package packages/my-lib --format markdown --compare - \
         > /tmp/comment.md
 
   - name: Post PR comment
