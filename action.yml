@@ -1,0 +1,72 @@
+name: 'Bundle Stats'
+description: 'Measure bundle sizes, bundled-with-deps sizes, and import times for package exports.'
+branding:
+  icon: package
+  color: blue
+
+inputs:
+  packages:
+    description: 'Comma-separated package names (resolved via workspaces) or paths. "." = root package.'
+    default: '.'
+  build-script:
+    description: 'npm script name to run per-package using PM filter syntax. Ignored if build-command is set.'
+    default: 'build'
+  build-command:
+    description: 'If set, runs this command once globally instead of per-package builds. For turbo/nx users.'
+    default: ''
+  base-ref:
+    description: 'Git ref for baseline. Defaults to PR base SHA.'
+    default: ''
+  head-ref:
+    description: 'Git ref for current. Defaults to current SHA.'
+    default: ''
+  max-import-time:
+    description: 'Max import time per export (e.g. 500ms, 2s).'
+    default: ''
+  max-bundle-size-gzip:
+    description: 'Max gzip bundle size per export (e.g. 100kb).'
+    default: ''
+  max-bundle-size-raw:
+    description: 'Max raw bundle size per export.'
+    default: ''
+  max-internal-size-gzip:
+    description: 'Max gzip internal size per export.'
+    default: ''
+  max-internal-size-raw:
+    description: 'Max raw internal size per export.'
+    default: ''
+  ignore:
+    description: 'Comma-separated glob patterns to skip exports.'
+    default: ''
+  only:
+    description: 'Comma-separated glob patterns to include only.'
+    default: ''
+  no-benchmark:
+    description: 'Skip import time benchmarks.'
+    default: 'false'
+  no-bundle:
+    description: 'Skip Rollup bundling.'
+    default: 'false'
+
+runs:
+  using: 'composite'
+  steps:
+    - shell: bash
+      env:
+        INPUT_PACKAGES: ${{ inputs.packages }}
+        INPUT_BUILD_SCRIPT: ${{ inputs.build-script }}
+        INPUT_BUILD_COMMAND: ${{ inputs.build-command }}
+        INPUT_BASE_REF: ${{ inputs.base-ref }}
+        INPUT_HEAD_REF: ${{ inputs.head-ref }}
+        INPUT_MAX_IMPORT_TIME: ${{ inputs.max-import-time }}
+        INPUT_MAX_BUNDLE_SIZE_GZIP: ${{ inputs.max-bundle-size-gzip }}
+        INPUT_MAX_BUNDLE_SIZE_RAW: ${{ inputs.max-bundle-size-raw }}
+        INPUT_MAX_INTERNAL_SIZE_GZIP: ${{ inputs.max-internal-size-gzip }}
+        INPUT_MAX_INTERNAL_SIZE_RAW: ${{ inputs.max-internal-size-raw }}
+        INPUT_IGNORE: ${{ inputs.ignore }}
+        INPUT_ONLY: ${{ inputs.only }}
+        INPUT_NO_BENCHMARK: ${{ inputs.no-benchmark }}
+        INPUT_NO_BUNDLE: ${{ inputs.no-bundle }}
+        GITHUB_TOKEN: ${{ github.token }}
+        ACTION_PATH: ${{ github.action_path }}
+      run: bash "${{ github.action_path }}/action/run.sh"
