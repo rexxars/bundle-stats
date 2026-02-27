@@ -51,7 +51,8 @@ inputs:
 runs:
   using: 'composite'
   steps:
-    - shell: bash
+    - name: Run bundle stats comparison
+      shell: bash
       env:
         INPUT_PACKAGES: ${{ inputs.packages }}
         INPUT_BUILD_SCRIPT: ${{ inputs.build-script }}

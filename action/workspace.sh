@@ -95,7 +95,7 @@ resolve_packages() {
     # Trim whitespace
     item="$(echo "$item" | xargs)"
     if [[ -n "$item" ]]; then
-      resolve_package "$item"
+      resolve_package "$item" || return 1
     fi
   done
 }

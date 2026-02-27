@@ -88,6 +88,7 @@ post_calculating "$PKG_DISPLAY"
 ERROR_FILE="$(mktemp)"
 cleanup() {
   rm -f "$ERROR_FILE"
+  rm -rf "${WORK_DIR:-}"
 }
 trap cleanup EXIT
 
@@ -102,12 +103,12 @@ trap on_error ERR
 
 # --- 5. Build CLI flags ---
 
-CLI_FLAGS=""
+CLI_FLAGS=()
 if [[ "${INPUT_NO_BENCHMARK:-false}" == "true" ]]; then
-  CLI_FLAGS="${CLI_FLAGS} --no-benchmark"
+  CLI_FLAGS+=(--no-benchmark)
 fi
 if [[ "${INPUT_NO_BUNDLE:-false}" == "true" ]]; then
-  CLI_FLAGS="${CLI_FLAGS} --no-bundle"
+  CLI_FLAGS+=(--no-bundle)
 fi
 
 # Handle comma-separated ignore patterns
@@ -116,7 +117,7 @@ if [[ -n "${INPUT_IGNORE:-}" ]]; then
   for pattern in "${IGNORE_PATTERNS[@]}"; do
     pattern="$(echo "$pattern" | xargs)"
     if [[ -n "$pattern" ]]; then
-      CLI_FLAGS="${CLI_FLAGS} --ignore ${pattern}"
+      CLI_FLAGS+=(--ignore "$pattern")
     fi
   done
 fi
@@ -127,7 +128,7 @@ if [[ -n "${INPUT_ONLY:-}" ]]; then
   for pattern in "${ONLY_PATTERNS[@]}"; do
     pattern="$(echo "$pattern" | xargs)"
     if [[ -n "$pattern" ]]; then
-      CLI_FLAGS="${CLI_FLAGS} --only ${pattern}"
+      CLI_FLAGS+=(--only "$pattern")
     fi
   done
 fi
@@ -140,6 +141,8 @@ path_to_slug() {
 
 # --- 6. Measure baseline ---
 
+WORK_DIR="$(mktemp -d)"
+
 echo "Checking out baseline: ${BASE_REF}"
 git checkout "$BASE_REF" 2>"$ERROR_FILE"
 
@@ -149,7 +152,7 @@ while IFS= read -r pkg_path; do
   [[ -z "$pkg_path" ]] && continue
   slug="$(path_to_slug "$pkg_path")"
   echo "Measuring baseline for ${pkg_path}..."
-  eval "${BUNDLE_STATS} --package ${pkg_path} --format json ${CLI_FLAGS}" > "/tmp/baseline-${slug}.json" 2>>"$ERROR_FILE"
+  $BUNDLE_STATS --package "$pkg_path" --format json "${CLI_FLAGS[@]}" > "${WORK_DIR}/baseline-${slug}.json" 2>>"$ERROR_FILE"
 done <<< "$PACKAGE_PATHS"
 
 echo "Checking out head: ${HEAD_REF}"
@@ -163,7 +166,7 @@ while IFS= read -r pkg_path; do
   [[ -z "$pkg_path" ]] && continue
   slug="$(path_to_slug "$pkg_path")"
   echo "Measuring current for ${pkg_path}..."
-  eval "${BUNDLE_STATS} --package ${pkg_path} --format json ${CLI_FLAGS}" > "/tmp/current-${slug}.json" 2>>"$ERROR_FILE"
+  $BUNDLE_STATS --package "$pkg_path" --format json "${CLI_FLAGS[@]}" > "${WORK_DIR}/current-${slug}.json" 2>>"$ERROR_FILE"
 done <<< "$PACKAGE_PATHS"
 
 # --- 8. Generate comparison markdown ---
@@ -174,7 +177,7 @@ while IFS= read -r pkg_path; do
   [[ -z "$pkg_path" ]] && continue
   slug="$(path_to_slug "$pkg_path")"
   echo "Generating comparison for ${pkg_path}..."
-  pkg_md="$(cat "/tmp/baseline-${slug}.json" | eval "${BUNDLE_STATS} --package ${pkg_path} --format markdown --compare - ${CLI_FLAGS}" 2>>"$ERROR_FILE")"
+  pkg_md="$(cat "${WORK_DIR}/baseline-${slug}.json" | $BUNDLE_STATS --package "$pkg_path" --format markdown --compare - "${CLI_FLAGS[@]}" 2>>"$ERROR_FILE")"
 
   if [[ -n "$MARKDOWN" ]]; then
     MARKDOWN="${MARKDOWN}
@@ -215,7 +218,7 @@ while IFS= read -r pkg_path; do
     const pkg = JSON.parse(readFileSync('${pkg_path}/package.json', 'utf-8'));
     process.stdout.write(pkg.name || '${pkg_path}');
   ")"
-  REPORT_ARGS="${REPORT_ARGS} --report ${pkg_name}:/tmp/current-${slug}.json"
+  REPORT_ARGS="${REPORT_ARGS} --report ${pkg_name}:${WORK_DIR}/current-${slug}.json"
 done <<< "$PACKAGE_PATHS"
 
 VIOLATIONS_MD=""

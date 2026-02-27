@@ -10,7 +10,9 @@
 run_builds() {
   local package_paths="$1"
 
-  # Global build command — run once and return
+  # Global build command — run once and return.
+  # eval is intentional: the build-command input is authored by the workflow
+  # maintainer who already has full code execution control via the workflow file.
   if [[ -n "${INPUT_BUILD_COMMAND:-}" ]]; then
     echo "Running global build command: ${INPUT_BUILD_COMMAND}"
     eval "$INPUT_BUILD_COMMAND"
