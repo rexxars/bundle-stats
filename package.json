@@ -1,0 +1,50 @@
+{
+  "name": "@sanity/bundle-stats",
+  "version": "0.1.0",
+  "description": "Measure bundle sizes, bundled-with-deps sizes, and import times for package exports",
+  "license": "MIT",
+  "author": "Sanity.io <hello@sanity.io>",
+  "bin": {
+    "bundle-stats": "./bin/bundle-stats.js"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "dist",
+    "bin/bundle-stats.js"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "check:types": "tsc --noEmit",
+    "check:format": "prettier --check .",
+    "format": "prettier --write .",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "@rollup/plugin-commonjs": "^28.0.3",
+    "@rollup/plugin-node-resolve": "^16.0.3",
+    "prettier": "^3.5.3",
+    "rollup": "^4.34.0",
+    "rollup-plugin-visualizer": "^5.14.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "eslint": "^9.28.0",
+    "tsup": "^8.5.0",
+    "typescript": "^5.8.2",
+    "typescript-eslint": "^8.33.0"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}
