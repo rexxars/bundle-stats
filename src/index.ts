@@ -20,6 +20,8 @@ export {compareReports} from './compare.ts'
 export {formatCli} from './format/cli.ts'
 export {formatMarkdown, type MarkdownOptions} from './format/markdown.ts'
 export {formatJson} from './format/json.ts'
+export {parseValue, evaluateThresholds, formatViolationsMarkdown} from './thresholds.ts'
+export type {ThresholdConfig, ThresholdViolation} from './thresholds.ts'
 
 import {discoverExports, getPeerDependencies, readPackageJson} from './exports.ts'
 import {measureBundledSize} from './measure/bundle.ts'

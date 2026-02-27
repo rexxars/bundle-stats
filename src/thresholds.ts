@@ -133,3 +133,26 @@ export function evaluateThresholds(
 
   return violations
 }
+
+export function formatViolationsMarkdown(violations: ThresholdViolation[]): string {
+  if (violations.length === 0) return ''
+
+  const lines: string[] = [
+    '### Threshold Violations',
+    '',
+    '| Export | Metric | Value | Threshold |',
+    '| :----- | :----- | ----: | --------: |',
+  ]
+
+  for (const v of violations) {
+    lines.push(
+      `| \`${v.exportName}\` | ${v.metric} | ${v.formattedValue} | ${v.formattedThreshold} |`,
+    )
+  }
+
+  lines.push('')
+  lines.push(`**${violations.length} threshold violation(s) — this check has failed.**`)
+  lines.push('')
+
+  return lines.join('\n')
+}

@@ -1,7 +1,7 @@
 import {describe, it} from 'node:test'
 import assert from 'node:assert/strict'
-import {parseValue, evaluateThresholds} from './thresholds.ts'
-import type {ThresholdConfig} from './thresholds.ts'
+import {parseValue, evaluateThresholds, formatViolationsMarkdown} from './thresholds.ts'
+import type {ThresholdConfig, ThresholdViolation} from './thresholds.ts'
 import type {Report} from './types.ts'
 
 describe('parseValue', () => {
@@ -54,9 +54,7 @@ function makeReport(overrides: Partial<Report['exports'][0]>[] = []): Report {
     package: 'my-pkg',
     version: '1.0.0',
     timestamp: '2026-01-01T00:00:00Z',
-    exports: overrides.length > 0
-      ? overrides.map((o) => ({...defaults, ...o}))
-      : [{...defaults}],
+    exports: overrides.length > 0 ? overrides.map((o) => ({...defaults, ...o})) : [{...defaults}],
   }
 }
 
@@ -87,9 +85,7 @@ describe('evaluateThresholds', () => {
   })
 
   it('detects bundle size gzip violation', () => {
-    const report = makeReport([
-      {bundledSize: {rawBytes: 5000, gzipBytes: 4000, treemapPath: null}},
-    ])
+    const report = makeReport([{bundledSize: {rawBytes: 5000, gzipBytes: 4000, treemapPath: null}}])
     const thresholds: ThresholdConfig = {maxBundleSizeGzip: 3000}
     const violations = evaluateThresholds(report, thresholds)
     assert.equal(violations.length, 1)
@@ -99,9 +95,7 @@ describe('evaluateThresholds', () => {
   })
 
   it('detects bundle size raw violation', () => {
-    const report = makeReport([
-      {bundledSize: {rawBytes: 8000, gzipBytes: 2000, treemapPath: null}},
-    ])
+    const report = makeReport([{bundledSize: {rawBytes: 8000, gzipBytes: 2000, treemapPath: null}}])
     const thresholds: ThresholdConfig = {maxBundleSizeRaw: 6000}
     const violations = evaluateThresholds(report, thresholds)
     assert.equal(violations.length, 1)
@@ -111,9 +105,7 @@ describe('evaluateThresholds', () => {
   })
 
   it('detects internal size gzip violation', () => {
-    const report = makeReport([
-      {internalSize: {rawBytes: 1000, gzipBytes: 800}},
-    ])
+    const report = makeReport([{internalSize: {rawBytes: 1000, gzipBytes: 800}}])
     const thresholds: ThresholdConfig = {maxInternalSizeGzip: 600}
     const violations = evaluateThresholds(report, thresholds)
     assert.equal(violations.length, 1)
@@ -123,9 +115,7 @@ describe('evaluateThresholds', () => {
   })
 
   it('detects internal size raw violation', () => {
-    const report = makeReport([
-      {internalSize: {rawBytes: 3000, gzipBytes: 500}},
-    ])
+    const report = makeReport([{internalSize: {rawBytes: 3000, gzipBytes: 500}}])
     const thresholds: ThresholdConfig = {maxInternalSizeRaw: 2000}
     const violations = evaluateThresholds(report, thresholds)
     assert.equal(violations.length, 1)
@@ -156,9 +146,7 @@ describe('evaluateThresholds', () => {
   })
 
   it('skips null measurements', () => {
-    const report = makeReport([
-      {bundledSize: null, importTime: null, internalSize: null},
-    ])
+    const report = makeReport([{bundledSize: null, importTime: null, internalSize: null}])
     const thresholds: ThresholdConfig = {
       maxImportTime: 100,
       maxBundleSizeGzip: 100,
@@ -183,5 +171,93 @@ describe('evaluateThresholds', () => {
     const report = makeReport()
     const violations = evaluateThresholds(report, {})
     assert.equal(violations.length, 0)
+  })
+})
+
+describe('formatViolationsMarkdown', () => {
+  it('returns empty string for no violations', () => {
+    assert.equal(formatViolationsMarkdown([]), '')
+  })
+
+  it('formats a single violation', () => {
+    const violations: ThresholdViolation[] = [
+      {
+        exportName: 'my-pkg',
+        metric: 'Import Time',
+        value: 300,
+        threshold: 200,
+        formattedValue: '300ms',
+        formattedThreshold: '200ms',
+      },
+    ]
+    const md = formatViolationsMarkdown(violations)
+    assert.ok(md.includes('### Threshold Violations'))
+    assert.ok(md.includes('| `my-pkg` | Import Time | 300ms | 200ms |'))
+    assert.ok(md.includes('**1 threshold violation(s)'))
+  })
+
+  it('formats multiple violations with correct count', () => {
+    const violations: ThresholdViolation[] = [
+      {
+        exportName: 'export-a',
+        metric: 'Import Time',
+        value: 300,
+        threshold: 200,
+        formattedValue: '300ms',
+        formattedThreshold: '200ms',
+      },
+      {
+        exportName: 'export-a',
+        metric: 'Bundle Size (gzip)',
+        value: 4000,
+        threshold: 3000,
+        formattedValue: '3.9 KB',
+        formattedThreshold: '2.9 KB',
+      },
+      {
+        exportName: 'export-b',
+        metric: 'Internal Size (raw)',
+        value: 3000,
+        threshold: 2000,
+        formattedValue: '2.9 KB',
+        formattedThreshold: '2.0 KB',
+      },
+    ]
+    const md = formatViolationsMarkdown(violations)
+    assert.ok(md.includes('**3 threshold violation(s)'))
+    assert.ok(md.includes('| `export-a` | Import Time | 300ms | 200ms |'))
+    assert.ok(md.includes('| `export-a` | Bundle Size (gzip) | 3.9 KB | 2.9 KB |'))
+    assert.ok(md.includes('| `export-b` | Internal Size (raw) | 2.9 KB | 2.0 KB |'))
+  })
+
+  it('includes the table header', () => {
+    const violations: ThresholdViolation[] = [
+      {
+        exportName: 'pkg',
+        metric: 'Import Time',
+        value: 300,
+        threshold: 200,
+        formattedValue: '300ms',
+        formattedThreshold: '200ms',
+      },
+    ]
+    const md = formatViolationsMarkdown(violations)
+    assert.ok(md.includes('| Export | Metric | Value | Threshold |'))
+    assert.ok(md.includes('| :----- | :----- | ----: | --------: |'))
+  })
+
+  it('includes failure message', () => {
+    const violations: ThresholdViolation[] = [
+      {
+        exportName: 'pkg',
+        metric: 'Import Time',
+        value: 300,
+        threshold: 200,
+        formattedValue: '300ms',
+        formattedThreshold: '200ms',
+      },
+    ]
+    const md = formatViolationsMarkdown(violations)
+    assert.ok(md.includes('this check has failed'))
   })
 })
