@@ -38,6 +38,8 @@ describe('parseValue', () => {
     assert.throws(() => parseValue('100'), /Invalid threshold value/)
     assert.throws(() => parseValue('100xyz'), /Invalid threshold value/)
     assert.throws(() => parseValue(''), /Invalid threshold value/)
+    assert.throws(() => parseValue('1.2.3kb'), /Invalid threshold value/)
+    assert.throws(() => parseValue('0.kb'), /Invalid threshold value/)
   })
 })
 
@@ -163,6 +165,15 @@ describe('evaluateThresholds', () => {
       {importTime: {medianMs: 9999, runs: [], failed: true, error: 'timeout'}},
     ])
     const thresholds: ThresholdConfig = {maxImportTime: 100}
+    const violations = evaluateThresholds(report, thresholds)
+    assert.equal(violations.length, 0)
+  })
+
+  it('does not violate when value equals threshold exactly', () => {
+    const report = makeReport([
+      {importTime: {medianMs: 200, runs: [200], failed: false, error: null}},
+    ])
+    const thresholds: ThresholdConfig = {maxImportTime: 200}
     const violations = evaluateThresholds(report, thresholds)
     assert.equal(violations.length, 0)
   })

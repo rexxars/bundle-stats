@@ -22,7 +22,7 @@ export function parseValue(input: string): number {
   const match = input
     .trim()
     .toLowerCase()
-    .match(/^([\d.]+)\s*(b|kb|mb|ms|s)$/)
+    .match(/^(\d+(?:\.\d+)?)\s*(b|kb|mb|ms|s)$/)
   if (!match) throw new Error(`Invalid threshold value: "${input}"`)
   const num = parseFloat(match[1])
   const unit = match[2]
