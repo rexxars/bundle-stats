@@ -1,0 +1,57 @@
+name: Release
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - uses: pnpm/action-setup@v4
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Release
+        id: semantic-release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_PUBLISH_TOKEN }}
+        run: npx semantic-release
+
+      - name: Update major version tag
+        if: steps.semantic-release.outcome == 'success'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Get the latest tag created by semantic-release
+          LATEST_TAG="$(git describe --tags --abbrev=0 2>/dev/null || echo '')"
+          if [[ -z "$LATEST_TAG" ]]; then
+            echo "No tag found, skipping major version tag update."
+            exit 0
+          fi
+
+          # Extract major version (e.g. v1.2.3 -> v1)
+          MAJOR="$(echo "$LATEST_TAG" | grep -oP '^v\d+')"
+          if [[ -z "$MAJOR" ]]; then
+            echo "Could not extract major version from ${LATEST_TAG}, skipping."
+            exit 0
+          fi
+
+          echo "Moving ${MAJOR} tag to ${LATEST_TAG}"
+          git tag -f "$MAJOR" "$LATEST_TAG"
+          git push origin "$MAJOR" --force
