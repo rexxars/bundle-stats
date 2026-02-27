@@ -1,5 +1,5 @@
 {
-  "name": "@sanity/bundle-stats",
+  "name": "@sanity-labs/bundle-stats",
   "version": "0.1.0",
   "description": "Measure bundle sizes, bundled-with-deps sizes, and import times for package exports",
   "license": "MIT",
