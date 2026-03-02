@@ -1,5 +1,5 @@
 import type {ComparisonReport, DeltaValue, ExportDelta, ExportReport, Report} from '../types.ts'
-import {formatBytes, formatDelta, formatMs} from './helpers.ts'
+import {formatBytes, formatDeltaOnly, formatMs} from './helpers.ts'
 
 /** Threshold (percent) above which import time regressions are highlighted. */
 const IMPORT_TIME_REGRESSION_THRESHOLD = 10
@@ -48,6 +48,20 @@ export function formatMarkdown(
   }
 
   const npmVersion = npmComparison?.baseline.refLabel ?? npmComparison?.baseline.version
+  const npmVersionFormatted = npmVersion ? vPrefix(npmVersion) : undefined
+
+  // Compute the label used in "vs <label>:" delta lines
+  let baselineLabel: string | undefined
+  if (effectiveComparison) {
+    if (!comparison && npmComparison && npmVersionFormatted) {
+      // npm promoted to primary
+      baselineLabel = `\`${npmVersionFormatted}\``
+    } else if (effectiveComparison.baseline.refLabel) {
+      baselineLabel = `\`${effectiveComparison.baseline.refLabel}\``
+    } else {
+      baselineLabel = `\`${effectiveComparison.baseline.version}\``
+    }
+  }
 
   const lines: string[] = []
   if (ci) lines.push('<!-- bundle-stats-comment -->')
@@ -60,10 +74,10 @@ export function formatMarkdown(
       const gitLabel = comparison.baseline.refLabel
         ? `\`${comparison.baseline.refLabel}\``
         : `\`${comparison.baseline.version}\` (${comparison.baseline.timestamp.split('T')[0]})`
-      lines.push(`Compared against ${gitLabel} · \`${npmVersion}\` (npm)`, '')
+      lines.push(`Compared against ${gitLabel} · \`${npmVersionFormatted}\` (npm)`, '')
     } else if (!comparison && npmComparison) {
       // Only npm comparison (promoted to primary)
-      lines.push(`Compared against \`${npmVersion}\` (npm)`, '')
+      lines.push(`Compared against \`${npmVersionFormatted}\` (npm)`, '')
     } else if (effectiveComparison.baseline.refLabel) {
       // Only git comparison with ref label
       lines.push(`Compared against \`${effectiveComparison.baseline.refLabel}\``, '')
@@ -82,7 +96,15 @@ export function formatMarkdown(
   for (const exp of report.exports) {
     const delta = deltasByKey.get(exp.key)
     const npmDelta = hasDualComparison ? npmDeltasByKey.get(exp.key) : undefined
-    lines.push(buildRow(exp, delta, npmDelta, hasDualComparison ? npmVersion : undefined))
+    lines.push(
+      buildRow(
+        exp,
+        delta,
+        npmDelta,
+        hasDualComparison ? npmVersion : undefined,
+        baselineLabel,
+      ),
+    )
   }
 
   // Handle removed exports (only in baseline)
@@ -127,12 +149,14 @@ function buildRow(
   delta: ExportDelta | undefined,
   npmDelta: ExportDelta | undefined,
   npmVersion: string | undefined,
+  baselineLabel: string | undefined,
 ): string {
   const name = formatName(exp.name, delta?.status)
   const internal = formatSizePairCell(
     exp.internalSize ? exp.internalSize.rawBytes : null,
     exp.internalSize ? exp.internalSize.gzipBytes : null,
     delta?.internalSize ?? null,
+    baselineLabel,
     npmDelta,
     'internalSize',
     npmVersion,
@@ -141,11 +165,12 @@ function buildRow(
     exp.bundledSize ? exp.bundledSize.rawBytes : null,
     exp.bundledSize ? exp.bundledSize.gzipBytes : null,
     delta?.bundledSize ?? null,
+    baselineLabel,
     npmDelta,
     'bundledSize',
     npmVersion,
   )
-  const importTime = formatImportCell(exp, delta?.importTime ?? null, npmDelta, npmVersion)
+  const importTime = formatImportCell(exp, delta?.importTime ?? null, baselineLabel, npmDelta, npmVersion)
 
   return `| ${name} | ${internal} | ${bundled} | ${importTime} |`
 }
@@ -158,34 +183,28 @@ function formatName(name: string, status: ExportDelta['status'] | undefined): st
 
 /**
  * Format a combined "raw / gzip 🗜️" size cell.
- * Delta (if present) is based on the gzip value.
+ * Delta (if present) is shown on a separate line as "vs `label`: delta".
  */
 function formatSizePairCell(
   rawBytes: number | null,
   gzipBytes: number | null,
   gzipDelta: DeltaValue | null,
+  baselineLabel: string | undefined,
   npmDelta: ExportDelta | undefined,
   field: 'internalSize' | 'bundledSize',
   npmVersion: string | undefined,
 ): string {
   if (rawBytes == null || gzipBytes == null) return '-'
 
-  const base = `${formatBytes(rawBytes)} / ${formatBytes(gzipBytes)} 🗜️`
+  let text = `${formatBytes(rawBytes)} / ${formatBytes(gzipBytes)} 🗜️`
 
-  let text: string
-  if (gzipDelta) {
-    const deltaStr = formatDelta(gzipDelta, formatBytes)
-    const deltaSuffix = noBreakParens(deltaStr.slice(deltaStr.indexOf(' (')))
-    text = `${base}${deltaSuffix}`
-    if (gzipDelta.delta > 0) text = `🔺 ${text}`
-    else if (gzipDelta.delta < 0) text = `🔽 ${text}`
-  } else {
-    text = base
+  if (gzipDelta && baselineLabel) {
+    text = `${text}<br>${formatComparisonLine(baselineLabel, gzipDelta, formatBytes)}`
   }
 
   if (npmDelta && npmVersion) {
     const npmLine = formatNpmDelta(npmDelta[field], npmDelta.status, npmVersion, formatBytes)
-    text = appendNpmLine(text, npmLine)
+    if (npmLine) text = `${text}<br>${npmLine}`
   }
 
   return text
@@ -194,6 +213,7 @@ function formatSizePairCell(
 function formatImportCell(
   exp: ExportReport,
   delta: DeltaValue | null,
+  baselineLabel: string | undefined,
   npmDelta: ExportDelta | undefined,
   npmVersion: string | undefined,
 ): string {
@@ -203,26 +223,31 @@ function formatImportCell(
     return `❌${exp.importTime.error ? ` ${exp.importTime.error}` : ''}`
   }
 
-  let text: string
-  if (delta) {
-    text = noBreakParens(formatDelta(delta, formatMs))
-    // Slower = regression
-    if (delta.delta > 0) {
-      const flag = delta.percent > IMPORT_TIME_REGRESSION_THRESHOLD ? ' ⚠️' : ''
-      text = `🔺 ${text}${flag}`
-    } else if (delta.delta < 0) {
-      text = `🔽 ${text}`
-    }
-  } else {
-    text = formatMs(exp.importTime.medianMs)
+  let text = formatMs(exp.importTime.medianMs)
+
+  if (delta && baselineLabel) {
+    const flag =
+      delta.delta > 0 && delta.percent > IMPORT_TIME_REGRESSION_THRESHOLD ? '&nbsp;⚠️' : ''
+    text = `${text}<br>${formatComparisonLine(baselineLabel, delta, formatMs)}${flag}`
   }
 
   if (npmDelta && npmVersion) {
     const npmLine = formatNpmDelta(npmDelta.importTime, npmDelta.status, npmVersion, formatMs)
-    text = appendNpmLine(text, npmLine)
+    if (npmLine) text = `${text}<br>${npmLine}`
   }
 
   return text
+}
+
+/** Format a "vs `label`: colored-delta" comparison line. */
+function formatComparisonLine(
+  label: string,
+  delta: DeltaValue,
+  unitFn: (n: number) => string,
+): string {
+  const deltaText = formatDeltaOnly(delta, unitFn)
+  const colored = colorDelta(deltaText, delta.delta)
+  return `vs&nbsp;${label}:&nbsp;${colored}`
 }
 
 function formatNpmDelta(
@@ -231,19 +256,26 @@ function formatNpmDelta(
   version: string,
   unitFn: (n: number) => string,
 ): string | null {
-  if (status === 'added') return `vs ${version}: 🆕`
+  const label = `\`${vPrefix(version)}\``
+  if (status === 'added') return `vs&nbsp;${label}:&nbsp;🆕`
   if (!delta) return null
   if (delta.delta === 0) return null
-  const sign = delta.delta >= 0 ? '+' : ''
-  return `vs ${version}: ${sign}${unitFn(delta.delta)}, ${sign}${delta.percent.toFixed(1)}%`
+  const deltaText = formatDeltaOnly(delta, unitFn)
+  const colored = colorDelta(deltaText, delta.delta)
+  return `vs&nbsp;${label}:&nbsp;${colored}`
 }
 
-function appendNpmLine(base: string, npmLine: string | null): string {
-  if (!npmLine) return base
-  return `${base}<br>${npmLine}`
+/**
+ * Wrap delta text in GitHub-compatible LaTeX color.
+ * Green for improvements (decrease) or no change, red for regressions (increase).
+ */
+function colorDelta(deltaText: string, delta: number): string {
+  const color = delta > 0 ? 'red' : 'green'
+  const escaped = deltaText.replace(/%/g, '\\%')
+  return '$' + `{\\color{${color}}\\text{${escaped}}}` + '$'
 }
 
-/** Prevent line breaks within parenthesized delta values, e.g. "(+0 B, +0.0%)" */
-function noBreakParens(text: string): string {
-  return text.replace(/\(([^)]+)\)/g, (match) => match.replaceAll(' ', '&nbsp;'))
+/** Ensure an npm version string has a `v` prefix. */
+function vPrefix(version: string): string {
+  return version.startsWith('v') ? version : `v${version}`
 }
