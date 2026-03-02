@@ -47,6 +47,9 @@ inputs:
   no-bundle:
     description: 'Skip Rollup bundling.'
     default: 'false'
+  compare-npm:
+    description: 'Compare against a published npm version. Use "latest" or a specific version like "5.12.0".'
+    default: ''
 
 runs:
   using: 'composite'
@@ -68,6 +71,7 @@ runs:
         INPUT_ONLY: ${{ inputs.only }}
         INPUT_NO_BENCHMARK: ${{ inputs.no-benchmark }}
         INPUT_NO_BUNDLE: ${{ inputs.no-bundle }}
+        INPUT_COMPARE_NPM: ${{ inputs.compare-npm }}
         GITHUB_TOKEN: ${{ github.token }}
         ACTION_PATH: ${{ github.action_path }}
       run: bash "${{ github.action_path }}/action/run.sh"

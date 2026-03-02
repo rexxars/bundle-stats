@@ -22,6 +22,7 @@ export {formatMarkdown, type MarkdownOptions} from './format/markdown.ts'
 export {formatJson} from './format/json.ts'
 export {parseValue, evaluateThresholds, formatViolationsMarkdown} from './thresholds.ts'
 export type {ThresholdConfig, ThresholdViolation} from './thresholds.ts'
+export {resolveNpmVersion, measureNpmPackage} from './npm.ts'
 
 import {discoverExports, getPeerDependencies, readPackageJson} from './exports.ts'
 import {measureBundledSize} from './measure/bundle.ts'

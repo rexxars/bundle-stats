@@ -1,4 +1,4 @@
-import type {ComparisonReport, ExportDelta, ExportReport, Report} from '../types.ts'
+import type {ComparisonReport, DeltaValue, ExportDelta, ExportReport, Report} from '../types.ts'
 import {formatBytes, formatDelta, formatMs} from './helpers.ts'
 
 /** Threshold (percent) above which import time regressions are highlighted. */
@@ -7,6 +7,8 @@ const IMPORT_TIME_REGRESSION_THRESHOLD = 10
 export interface MarkdownOptions {
   /** Include CI-specific content (HTML comment tag, treemap artifact note). Default: false. */
   ci?: boolean
+  /** Comparison against a published npm version. */
+  npmComparison?: ComparisonReport
 }
 
 /**
@@ -14,6 +16,10 @@ export interface MarkdownOptions {
  *
  * The output is intended for use as a PR comment. When `comparison` is
  * provided, delta values are shown inline and regressions are flagged.
+ *
+ * When `npmComparison` is also provided, a second line per cell shows the
+ * delta against the npm version. When only `npmComparison` is provided
+ * (no git baseline), it is promoted to the primary comparison role.
  */
 export function formatMarkdown(
   report: Report,
@@ -21,23 +27,50 @@ export function formatMarkdown(
   options?: MarkdownOptions,
 ): string {
   const ci = options?.ci ?? false
+  const npmComparison = options?.npmComparison
+
+  // When only npmComparison is provided, promote it to the primary comparison
+  const effectiveComparison = comparison ?? npmComparison
+  const hasDualComparison = !!(comparison && npmComparison)
+
   const deltasByKey = new Map<string, ExportDelta>()
-  if (comparison) {
-    for (const d of comparison.deltas) {
+  if (effectiveComparison) {
+    for (const d of effectiveComparison.deltas) {
       deltasByKey.set(d.key, d)
     }
   }
+
+  const npmDeltasByKey = new Map<string, ExportDelta>()
+  if (hasDualComparison && npmComparison) {
+    for (const d of npmComparison.deltas) {
+      npmDeltasByKey.set(d.key, d)
+    }
+  }
+
+  const npmVersion = npmComparison?.baseline.refLabel ?? npmComparison?.baseline.version
 
   const lines: string[] = []
   if (ci) lines.push('<!-- bundle-stats-comment -->')
   lines.push(`## 📦 Bundle Stats — \`${report.package}\``, '')
 
-  if (comparison) {
-    if (comparison.baseline.refLabel) {
-      lines.push(`Compared against \`${comparison.baseline.refLabel}\``, '')
+  // Comparison header
+  if (effectiveComparison) {
+    if (hasDualComparison && comparison) {
+      // Both git and npm comparisons
+      const gitLabel = comparison.baseline.refLabel
+        ? `\`${comparison.baseline.refLabel}\``
+        : `\`${comparison.baseline.version}\` (${comparison.baseline.timestamp.split('T')[0]})`
+      lines.push(`Compared against ${gitLabel} · \`${npmVersion}\` (npm)`, '')
+    } else if (!comparison && npmComparison) {
+      // Only npm comparison (promoted to primary)
+      lines.push(`Compared against \`${npmVersion}\` (npm)`, '')
+    } else if (effectiveComparison.baseline.refLabel) {
+      // Only git comparison with ref label
+      lines.push(`Compared against \`${effectiveComparison.baseline.refLabel}\``, '')
     } else {
-      const date = comparison.baseline.timestamp.split('T')[0]
-      lines.push(`Compared against \`${comparison.baseline.version}\` (${date})`, '')
+      // Only git comparison without ref label
+      const date = effectiveComparison.baseline.timestamp.split('T')[0]
+      lines.push(`Compared against \`${effectiveComparison.baseline.version}\` (${date})`, '')
     }
   }
 
@@ -48,12 +81,13 @@ export function formatMarkdown(
 
   for (const exp of report.exports) {
     const delta = deltasByKey.get(exp.key)
-    lines.push(buildRow(exp, delta))
+    const npmDelta = hasDualComparison ? npmDeltasByKey.get(exp.key) : undefined
+    lines.push(buildRow(exp, delta, npmDelta, hasDualComparison ? npmVersion : undefined))
   }
 
   // Handle removed exports (only in baseline)
-  if (comparison) {
-    for (const d of comparison.deltas) {
+  if (effectiveComparison) {
+    for (const d of effectiveComparison.deltas) {
       if (d.status === 'removed') {
         lines.push(`| 🗑️ ~~${d.name}~~ | - | - | - |`)
       }
@@ -63,7 +97,7 @@ export function formatMarkdown(
   lines.push('')
 
   // Footer
-  if (comparison) {
+  if (effectiveComparison) {
     const details = [
       `- Import time regressions over ${IMPORT_TIME_REGRESSION_THRESHOLD}% are flagged with ⚠️`,
     ]
@@ -88,19 +122,30 @@ export function formatMarkdown(
   return lines.join('\n')
 }
 
-function buildRow(exp: ExportReport, delta: ExportDelta | undefined): string {
+function buildRow(
+  exp: ExportReport,
+  delta: ExportDelta | undefined,
+  npmDelta: ExportDelta | undefined,
+  npmVersion: string | undefined,
+): string {
   const name = formatName(exp.name, delta?.status)
   const internal = formatSizePairCell(
     exp.internalSize ? exp.internalSize.rawBytes : null,
     exp.internalSize ? exp.internalSize.gzipBytes : null,
     delta?.internalSize ?? null,
+    npmDelta,
+    'internalSize',
+    npmVersion,
   )
   const bundled = formatSizePairCell(
     exp.bundledSize ? exp.bundledSize.rawBytes : null,
     exp.bundledSize ? exp.bundledSize.gzipBytes : null,
     delta?.bundledSize ?? null,
+    npmDelta,
+    'bundledSize',
+    npmVersion,
   )
-  const importTime = formatImportCell(exp, delta?.importTime ?? null)
+  const importTime = formatImportCell(exp, delta?.importTime ?? null, npmDelta, npmVersion)
 
   return `| ${name} | ${internal} | ${bundled} | ${importTime} |`
 }
@@ -118,27 +163,39 @@ function formatName(name: string, status: ExportDelta['status'] | undefined): st
 function formatSizePairCell(
   rawBytes: number | null,
   gzipBytes: number | null,
-  gzipDelta: import('../types.ts').DeltaValue | null,
+  gzipDelta: DeltaValue | null,
+  npmDelta: ExportDelta | undefined,
+  field: 'internalSize' | 'bundledSize',
+  npmVersion: string | undefined,
 ): string {
   if (rawBytes == null || gzipBytes == null) return '-'
 
   const base = `${formatBytes(rawBytes)} / ${formatBytes(gzipBytes)} 🗜️`
 
+  let text: string
   if (gzipDelta) {
     const deltaStr = formatDelta(gzipDelta, formatBytes)
     const deltaSuffix = noBreakParens(deltaStr.slice(deltaStr.indexOf(' (')))
-    const text = `${base}${deltaSuffix}`
-    if (gzipDelta.delta > 0) return `🔺 ${text}`
-    if (gzipDelta.delta < 0) return `🔽 ${text}`
-    return text
+    text = `${base}${deltaSuffix}`
+    if (gzipDelta.delta > 0) text = `🔺 ${text}`
+    else if (gzipDelta.delta < 0) text = `🔽 ${text}`
+  } else {
+    text = base
   }
 
-  return base
+  if (npmDelta && npmVersion) {
+    const npmLine = formatNpmDelta(npmDelta[field], npmDelta.status, npmVersion, formatBytes)
+    text = appendNpmLine(text, npmLine)
+  }
+
+  return text
 }
 
 function formatImportCell(
   exp: ExportReport,
-  delta: import('../types.ts').DeltaValue | null,
+  delta: DeltaValue | null,
+  npmDelta: ExportDelta | undefined,
+  npmVersion: string | undefined,
 ): string {
   if (exp.importTime == null) return '-'
 
@@ -146,18 +203,44 @@ function formatImportCell(
     return `❌${exp.importTime.error ? ` ${exp.importTime.error}` : ''}`
   }
 
+  let text: string
   if (delta) {
-    const text = noBreakParens(formatDelta(delta, formatMs))
+    text = noBreakParens(formatDelta(delta, formatMs))
     // Slower = regression
     if (delta.delta > 0) {
       const flag = delta.percent > IMPORT_TIME_REGRESSION_THRESHOLD ? ' ⚠️' : ''
-      return `🔺 ${text}${flag}`
+      text = `🔺 ${text}${flag}`
+    } else if (delta.delta < 0) {
+      text = `🔽 ${text}`
     }
-    if (delta.delta < 0) return `🔽 ${text}`
-    return text
+  } else {
+    text = formatMs(exp.importTime.medianMs)
   }
 
-  return formatMs(exp.importTime.medianMs)
+  if (npmDelta && npmVersion) {
+    const npmLine = formatNpmDelta(npmDelta.importTime, npmDelta.status, npmVersion, formatMs)
+    text = appendNpmLine(text, npmLine)
+  }
+
+  return text
+}
+
+function formatNpmDelta(
+  delta: DeltaValue | null,
+  status: ExportDelta['status'],
+  version: string,
+  unitFn: (n: number) => string,
+): string | null {
+  if (status === 'added') return `vs ${version}: 🆕`
+  if (!delta) return null
+  if (delta.delta === 0) return null
+  const sign = delta.delta >= 0 ? '+' : ''
+  return `vs ${version}: ${sign}${unitFn(delta.delta)}, ${sign}${delta.percent.toFixed(1)}%`
+}
+
+function appendNpmLine(base: string, npmLine: string | null): string {
+  if (!npmLine) return base
+  return `${base}<br>${npmLine}`
 }
 
 /** Prevent line breaks within parenthesized delta values, e.g. "(+0 B, +0.0%)" */

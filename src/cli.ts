@@ -6,7 +6,8 @@ import {formatCli} from './format/cli.ts'
 import {formatJson} from './format/json.ts'
 import {formatMarkdown} from './format/markdown.ts'
 import {generateReport} from './index.ts'
-import type {Report} from './types.ts'
+import {resolveNpmVersion, measureNpmPackage} from './npm.ts'
+import type {ComparisonReport, Report} from './types.ts'
 
 export async function main(): Promise<void> {
   const {values} = parseArgs({
@@ -14,6 +15,7 @@ export async function main(): Promise<void> {
       package: {type: 'string', default: '.'},
       format: {type: 'string', default: 'cli'},
       compare: {type: 'string'},
+      'compare-npm': {type: 'string'},
       ignore: {type: 'string', multiple: true, default: []},
       only: {type: 'string', multiple: true, default: []},
       'no-benchmark': {type: 'boolean', default: false},
@@ -33,6 +35,7 @@ Options:
   --package <path>     Path to target package directory or package.json (default: .)
   --format <fmt>       Output format: cli | markdown | json (default: cli)
   --compare <path|->   Path to baseline JSON report, or - for stdin
+  --compare-npm <ver>  Compare against a published npm version (e.g. "latest", "5.12.0")
   --ignore <pattern>   Glob pattern to skip exports (repeatable)
   --only <pattern>     Only include matching exports (repeatable)
   --no-benchmark       Skip import time benchmarks
@@ -79,39 +82,47 @@ Options:
     report.refLabel = values['ref-label']
   }
 
-  // Optionally compare against a baseline
-  let output: string
-
+  // Optionally compare against a git baseline
+  let comparison: ComparisonReport | undefined
   if (values.compare) {
     progress(`Reading baseline from ${values.compare === '-' ? 'stdin' : values.compare}...`)
     const baseline = readCompareData(values.compare)
-    const comparison = compareReports(report, baseline)
+    comparison = compareReports(report, baseline)
+  }
 
-    switch (format) {
-      case 'json':
-        output = formatJson(report)
-        break
-      case 'markdown':
-        output = formatMarkdown(report, comparison, {ci})
-        break
-      case 'cli':
-      default:
-        output = formatCli(report, comparison)
-        break
-    }
-  } else {
-    switch (format) {
-      case 'json':
-        output = formatJson(report)
-        break
-      case 'markdown':
-        output = formatMarkdown(report, undefined, {ci})
-        break
-      case 'cli':
-      default:
-        output = formatCli(report)
-        break
-    }
+  // Optionally compare against a published npm version
+  let npmComparison: ComparisonReport | undefined
+  if (values['compare-npm']) {
+    const version = values['compare-npm']
+    const resolvedVersion = resolveNpmVersion(report.package, version === 'latest' ? true : version)
+    progress(`Comparing against npm ${report.package}@${resolvedVersion}...`)
+    const npmReport = await measureNpmPackage({
+      packageName: report.package,
+      version: resolvedVersion,
+      reportOptions: {
+        ignorePatterns: values.ignore ?? [],
+        onlyPatterns: values.only ?? [],
+        noBenchmark: values['no-benchmark']!,
+        noBundle: values['no-bundle']!,
+        outdir: values.outdir!,
+      },
+      onProgress: progress,
+    })
+    npmComparison = compareReports(report, npmReport)
+  }
+
+  let output: string
+  switch (format) {
+    case 'json':
+      output = formatJson(report)
+      break
+    case 'markdown':
+      output = formatMarkdown(report, comparison, {ci, npmComparison})
+      break
+    case 'cli':
+    default:
+      output = formatCli(report, comparison, npmComparison)
+      break
   }
 
   // Run markdown output through prettier for aligned tables

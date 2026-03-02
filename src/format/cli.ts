@@ -11,7 +11,28 @@ const COLUMNS = ['Export', 'Internal', 'Bundled', 'Import Time'] as const
  * When a ComparisonReport is provided, deltas are shown inline with
  * colour-coded indicators (green for improvements, red for regressions).
  */
-export function formatCli(report: Report, comparison?: ComparisonReport): string {
+export function formatCli(
+  report: Report,
+  comparison?: ComparisonReport,
+  npmComparison?: ComparisonReport,
+): string {
+  const lines: string[] = [
+    '',
+    styleText('bold', `Bundle Stats: ${report.package}@${report.version}`),
+  ]
+
+  lines.push(...buildTable(report, comparison))
+
+  if (npmComparison) {
+    const npmVersion = npmComparison.baseline.refLabel ?? npmComparison.baseline.version
+    lines.push(styleText('bold', `vs npm ${npmVersion}`))
+    lines.push(...buildTable(report, npmComparison))
+  }
+
+  return lines.join('\n')
+}
+
+function buildTable(report: Report, comparison?: ComparisonReport): string[] {
   const deltasByKey = new Map<string, ExportDelta>()
   if (comparison) {
     for (const d of comparison.deltas) {
@@ -49,13 +70,7 @@ export function formatCli(report: Report, comparison?: ComparisonReport): string
   const headerCells = COLUMNS.map((col, i) => styleText('bold', pad(col, widths[i])))
   const separator = widths.map((w) => '─'.repeat(w))
 
-  const lines: string[] = [
-    '',
-    styleText('bold', `Bundle Stats: ${report.package}@${report.version}`),
-    '',
-    `  ${headerCells.join('  │  ')}`,
-    `  ${separator.join('──┼──')}`,
-  ]
+  const lines: string[] = ['', `  ${headerCells.join('  │  ')}`, `  ${separator.join('──┼──')}`]
 
   for (const row of rows) {
     const cells = row.styled.map((cell, i) => padStyled(cell, row.plain[i], widths[i]))
@@ -64,7 +79,7 @@ export function formatCli(report: Report, comparison?: ComparisonReport): string
 
   lines.push('')
 
-  return lines.join('\n')
+  return lines
 }
 
 function buildRow(

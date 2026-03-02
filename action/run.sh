@@ -210,7 +210,12 @@ while IFS= read -r pkg_path; do
   [[ -z "$pkg_path" ]] && continue
   slug="$(path_to_slug "$pkg_path")"
   echo "Generating comparison for ${pkg_path}..."
-  pkg_md="$(cat "${WORK_DIR}/baseline-${slug}.json" | $BUNDLE_STATS --package "$pkg_path" --format markdown --compare - "${CLI_FLAGS[@]}" 2>>"$ERROR_FILE")"
+  COMPARE_NPM_FLAG=()
+  if [[ -n "${INPUT_COMPARE_NPM:-}" ]]; then
+    COMPARE_NPM_FLAG=(--compare-npm "${INPUT_COMPARE_NPM}")
+  fi
+
+  pkg_md="$(cat "${WORK_DIR}/baseline-${slug}.json" | $BUNDLE_STATS --package "$pkg_path" --format markdown --compare - "${COMPARE_NPM_FLAG[@]}" "${CLI_FLAGS[@]}" 2>>"$ERROR_FILE")"
 
   if [[ -n "$MARKDOWN" ]]; then
     MARKDOWN="${MARKDOWN}
