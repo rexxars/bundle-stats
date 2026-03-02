@@ -5,6 +5,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.0](https://github.com/rexxars/bundle-stats/compare/v1.2.0...v1.3.0) (2026-03-02)
+
+### Features
+
+- use colored comparison lines for markdown delta formatting ([6377f73](https://github.com/rexxars/bundle-stats/commit/6377f73a37b2868691e8002646426f66a74585a4))
+
 ## [1.2.0](https://github.com/rexxars/bundle-stats/compare/v1.1.0...v1.2.0) (2026-03-02)
 
 ### Features
