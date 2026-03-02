@@ -13,6 +13,13 @@ source "${SCRIPT_DIR}/workspace.sh"
 # shellcheck source=action/build.sh
 source "${SCRIPT_DIR}/build.sh"
 
+# Install action's own runtime dependencies (rollup, plugins, prettier)
+# These aren't bundled because rollup requires platform-specific native bindings
+(cd "$ACTION_ROOT" && npm install --omit=dev --no-audit --no-fund 2>&1) || {
+  echo "::error::Failed to install bundle-stats dependencies"
+  exit 1
+}
+
 BUNDLE_STATS="node ${ACTION_ROOT}/bin/bundle-stats.ts"
 
 # --- Error trap (set up early so all failures are caught) ---
