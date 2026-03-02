@@ -5,6 +5,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.2](https://github.com/rexxars/bundle-stats/compare/v1.0.1...v1.0.2) (2026-03-02)
+
+### Bug Fixes
+
+- improve error reporting in CLI and GitHub Action ([bc15b04](https://github.com/rexxars/bundle-stats/commit/bc15b04a8f0b192b1e87ffba097e62d867e5a089))
+
 ## [1.0.1](https://github.com/rexxars/bundle-stats/compare/v1.0.0...v1.0.1) (2026-03-02)
 
 ### Bug Fixes
