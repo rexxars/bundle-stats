@@ -1,17 +1,17 @@
 {
-  "name": "@sanity-labs/bundle-stats",
+  "name": "@rexxars/bundle-stats",
   "version": "0.1.0",
   "description": "Measure bundle sizes, bundled-with-deps sizes, and import times for package exports",
   "license": "MIT",
-  "author": "Sanity.io <hello@sanity.io>",
+  "author": "Espen Hovlandsdal <espen@hovlandsdal.com>",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sanity-labs/bundle-stats.git"
+    "url": "git+https://github.com/rexxars/bundle-stats.git"
   },
   "bugs": {
-    "url": "https://github.com/sanity-labs/bundle-stats/issues"
+    "url": "https://github.com/rexxars/bundle-stats/issues"
   },
-  "homepage": "https://github.com/sanity-labs/bundle-stats#readme",
+  "homepage": "https://github.com/rexxars/bundle-stats#readme",
   "bin": {
     "bundle-stats": "./bin/bundle-stats.js"
   },

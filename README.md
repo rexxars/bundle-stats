@@ -1,4 +1,4 @@
-# @sanity-labs/bundle-stats
+# @rexxars/bundle-stats
 
 Measure bundle sizes, bundled-with-deps sizes, and import times for any npm package's exports.
 
@@ -7,7 +7,7 @@ Generates reports in three formats (terminal, Markdown, JSON) and can compare ag
 ## Install
 
 ```bash
-npm install -D @sanity-labs/bundle-stats
+npm install -D @rexxars/bundle-stats
 ```
 
 Requires **Node.js 24** or later.
@@ -103,7 +103,7 @@ jobs:
         with:
           node-version: 24
 
-      - uses: sanity-labs/bundle-stats@v1
+      - uses: rexxars/bundle-stats@v1
         with:
           packages: 'sanity, @sanity/vision'
           max-import-time: 500ms
@@ -165,7 +165,7 @@ steps:
 The package also exports a programmatic API:
 
 ```ts
-import {generateReport, compareReports, formatMarkdown} from '@sanity-labs/bundle-stats'
+import {generateReport, compareReports, formatMarkdown} from '@rexxars/bundle-stats'
 
 const report = await generateReport({
   packagePath: './packages/my-lib',

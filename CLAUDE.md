@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Overview
 
-`@sanity-labs/bundle-stats` measures bundle sizes, bundled-with-deps sizes, and import times for npm package exports. It outputs reports as terminal tables, Markdown, or JSON, and can compare against a baseline to show deltas. Designed for CI workflows that post PR comments with size regressions.
+`@rexxars/bundle-stats` measures bundle sizes, bundled-with-deps sizes, and import times for npm package exports. It outputs reports as terminal tables, Markdown, or JSON, and can compare against a baseline to show deltas. Designed for CI workflows that post PR comments with size regressions.
 
 Includes a colocated composite GitHub Action (`action.yml` + `action/`) that automates before/after comparison on PRs with comment lifecycle management.
 
