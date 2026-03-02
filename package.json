@@ -37,7 +37,8 @@
     "format": "prettier --write .",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test": "node --test src/**/*.test.ts"
+    "test": "node --test src/**/*.test.ts",
+    "prepublishOnly": "tsup"
   },
   "dependencies": {
     "@rollup/plugin-commonjs": "^28.0.3",
