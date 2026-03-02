@@ -1,6 +1,6 @@
 {
   "name": "@rexxars/bundle-stats",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Measure bundle sizes, bundled-with-deps sizes, and import times for package exports",
   "license": "MIT",
   "author": "Espen Hovlandsdal <espen@hovlandsdal.com>",

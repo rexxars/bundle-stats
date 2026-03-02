@@ -5,6 +5,16 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.2.0](https://github.com/rexxars/bundle-stats/compare/v1.1.0...v1.2.0) (2026-03-02)
+
+### Features
+
+- add --compare-npm flag for comparing against published npm versions ([d9c97e9](https://github.com/rexxars/bundle-stats/commit/d9c97e9386f1ab26fa33b6a25ca12c74ec2f08fc))
+
+### Bug Fixes
+
+- remove unused export from MeasureNpmPackageOptions interface ([d813efd](https://github.com/rexxars/bundle-stats/commit/d813efd2b01f679a045a519188ffffc01f3e0bfe))
+
 ## [1.1.0](https://github.com/rexxars/bundle-stats/compare/v1.0.4...v1.1.0) (2026-03-02)
 
 ### Features
