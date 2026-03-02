@@ -195,14 +195,14 @@ function formatSizePairCell(
 ): string {
   if (rawBytes == null || gzipBytes == null) return '-'
 
-  let text = `${formatBytes(rawBytes)} / ${formatBytes(gzipBytes)} 🗜️`
+  let text = `${formatBytesMd(rawBytes)}&nbsp;/&nbsp;${formatBytesMd(gzipBytes)}&nbsp;🗜️`
 
   if (gzipDelta && baselineLabel) {
-    text = `${text}<br>${formatComparisonLine(baselineLabel, gzipDelta, formatBytes)}`
+    text = `${text}<br>${formatComparisonLine(baselineLabel, gzipDelta, formatBytesMd)}`
   }
 
   if (npmDelta && npmVersion) {
-    const npmLine = formatNpmDelta(npmDelta[field], npmDelta.status, npmVersion, formatBytes)
+    const npmLine = formatNpmDelta(npmDelta[field], npmDelta.status, npmVersion, formatBytesMd)
     if (npmLine) text = `${text}<br>${npmLine}`
   }
 
@@ -270,7 +270,13 @@ function formatNpmDelta(
  */
 function colorDelta(deltaText: string, delta: number): string {
   const color = delta > 0 ? 'red' : 'green'
-  return `<font color="${color}">${deltaText}</font>`
+  const noBreak = deltaText.replace(/, /g, ',&nbsp;')
+  return `<font color="${color}">${noBreak}</font>`
+}
+
+/** Like formatBytes but without a space before the unit, matching formatMs style. */
+function formatBytesMd(bytes: number): string {
+  return formatBytes(bytes).replace(' ', '&nbsp;')
 }
 
 /** Ensure an npm version string has a `v` prefix. */

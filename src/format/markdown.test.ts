@@ -67,8 +67,8 @@ describe('formatMarkdown', () => {
     it('renders export row with sizes and import time', () => {
       const md = formatMarkdown(makeReport())
       assert.ok(md.includes('| `my-pkg` |'))
-      assert.ok(md.includes('1000 B / 500 B 🗜️'))
-      assert.ok(md.includes('4.9 KB / 2.0 KB 🗜️'))
+      assert.ok(md.includes('1000&nbsp;B&nbsp;/&nbsp;500&nbsp;B&nbsp;🗜️'))
+      assert.ok(md.includes('4.9&nbsp;KB&nbsp;/&nbsp;2.0&nbsp;KB&nbsp;🗜️'))
       assert.ok(md.includes('100ms'))
     })
 
@@ -165,7 +165,7 @@ describe('formatMarkdown', () => {
       })
       const md = formatMarkdown(makeReport(), comp)
       assert.ok(md.includes('<font color="red">'))
-      assert.ok(md.includes('+100 B, +20.0%'))
+      assert.ok(md.includes('+100&nbsp;B,&nbsp;+20.0%'))
     })
 
     it('shows colored delta for size improvement (green)', () => {
@@ -178,7 +178,7 @@ describe('formatMarkdown', () => {
       })
       const md = formatMarkdown(makeReport(), comp)
       assert.ok(md.includes('<font color="green">'))
-      assert.ok(md.includes('-100 B, -16.7%'))
+      assert.ok(md.includes('-100&nbsp;B,&nbsp;-16.7%'))
     })
 
     it('shows "vs `label`:" prefix on comparison lines', () => {
@@ -199,7 +199,7 @@ describe('formatMarkdown', () => {
       })
       const md = formatMarkdown(makeReport(), comp)
       assert.ok(md.includes('100ms'))
-      assert.ok(md.includes('+20ms, +20.0%'))
+      assert.ok(md.includes('+20ms,&nbsp;+20.0%'))
     })
 
     it('flags import time regression over threshold with warning', () => {
@@ -287,7 +287,7 @@ describe('formatMarkdown', () => {
       })
       const md = formatMarkdown(makeReport(), undefined, {npmComparison: npmComp})
       assert.ok(md.includes('vs&nbsp;`v1.2.3`'))
-      assert.ok(md.includes('-100 B'))
+      assert.ok(md.includes('-100&nbsp;B'))
     })
   })
 
@@ -374,7 +374,7 @@ describe('formatMarkdown', () => {
         deltas: [delta],
       })
       const md = formatMarkdown(makeReport(), comp)
-      assert.ok(md.includes('<font color="red">+100 B, +20.0%</font>'))
+      assert.ok(md.includes('<font color="red">+100&nbsp;B,&nbsp;+20.0%</font>'))
     })
 
     it('uses <font color="green"> for improvements', () => {
@@ -386,7 +386,7 @@ describe('formatMarkdown', () => {
         deltas: [delta],
       })
       const md = formatMarkdown(makeReport(), comp)
-      assert.ok(md.includes('<font color="green">-100 B, -16.7%</font>'))
+      assert.ok(md.includes('<font color="green">-100&nbsp;B,&nbsp;-16.7%</font>'))
     })
 
     it('does not contain LaTeX syntax', () => {
