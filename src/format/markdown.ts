@@ -64,7 +64,6 @@ export function formatMarkdown(
   }
 
   const lines: string[] = []
-  if (ci) lines.push('<!-- bundle-stats-comment -->')
   lines.push(`## 📦 Bundle Stats — \`${report.package}\``, '')
 
   // Comparison header
@@ -266,13 +265,12 @@ function formatNpmDelta(
 }
 
 /**
- * Wrap delta text in GitHub-compatible LaTeX color.
+ * Wrap delta text in GitHub-compatible colored HTML.
  * Green for improvements (decrease) or no change, red for regressions (increase).
  */
 function colorDelta(deltaText: string, delta: number): string {
   const color = delta > 0 ? 'red' : 'green'
-  const escaped = deltaText.replace(/%/g, '\\%')
-  return '$' + `{\\color{${color}}\\text{${escaped}}}` + '$'
+  return `<font color="${color}">${deltaText}</font>`
 }
 
 /** Ensure an npm version string has a `v` prefix. */
