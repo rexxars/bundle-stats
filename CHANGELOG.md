@@ -5,6 +5,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.3.1](https://github.com/rexxars/bundle-stats/compare/v1.3.0...v1.3.1) (2026-03-02)
+
+### Bug Fixes
+
+- use HTML font color instead of LaTeX for markdown deltas, add tests ([689c7db](https://github.com/rexxars/bundle-stats/commit/689c7db67b5a4456a36119958bfbd95c4a7a49ab))
+
 ## [1.3.0](https://github.com/rexxars/bundle-stats/compare/v1.2.0...v1.3.0) (2026-03-02)
 
 ### Features
