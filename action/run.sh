@@ -73,6 +73,16 @@ fi
 # Head ref
 HEAD_REF="${INPUT_HEAD_REF:-${GITHUB_SHA:-}}"
 
+# Base branch name (for --ref-label)
+BASE_BRANCH=""
+if [[ -n "${GITHUB_EVENT_PATH:-}" ]]; then
+  BASE_BRANCH="$(node --input-type=module -e "
+    import {readFileSync} from 'node:fs';
+    const event = JSON.parse(readFileSync('${GITHUB_EVENT_PATH}', 'utf-8'));
+    process.stdout.write(event.pull_request?.base?.ref || '');
+  ")"
+fi
+
 if [[ -z "$PR_NUMBER" ]]; then
   echo "Could not determine PR number. Is this running on a pull_request event?" >>"$ERROR_FILE"
   false # trigger ERR trap
@@ -171,7 +181,7 @@ while IFS= read -r pkg_path; do
   slug="$(path_to_slug "$pkg_path")"
   echo "Measuring baseline for ${pkg_path}..."
   echo "Measuring baseline for ${pkg_path}" >>"$ERROR_FILE"
-  $BUNDLE_STATS --package "$pkg_path" --format json "${CLI_FLAGS[@]}" > "${WORK_DIR}/baseline-${slug}.json" 2>>"$ERROR_FILE"
+  $BUNDLE_STATS --package "$pkg_path" --format json --ref-label "${BASE_BRANCH:-baseline} (${BASE_REF:0:8})" "${CLI_FLAGS[@]}" > "${WORK_DIR}/baseline-${slug}.json" 2>>"$ERROR_FILE"
 done <<< "$PACKAGE_PATHS"
 
 echo "Fetching head ref: ${HEAD_REF}"

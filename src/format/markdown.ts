@@ -33,8 +33,12 @@ export function formatMarkdown(
   lines.push(`## 📦 Bundle Stats — \`${report.package}\``, '')
 
   if (comparison) {
-    const date = comparison.baseline.timestamp.split('T')[0]
-    lines.push(`Compared against \`${comparison.baseline.version}\` (${date})`, '')
+    if (comparison.baseline.refLabel) {
+      lines.push(`Compared against \`${comparison.baseline.refLabel}\``, '')
+    } else {
+      const date = comparison.baseline.timestamp.split('T')[0]
+      lines.push(`Compared against \`${comparison.baseline.version}\` (${date})`, '')
+    }
   }
 
   lines.push(

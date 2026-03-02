@@ -18,6 +18,7 @@ export async function main(): Promise<void> {
       only: {type: 'string', multiple: true, default: []},
       'no-benchmark': {type: 'boolean', default: false},
       'no-bundle': {type: 'boolean', default: false},
+      'ref-label': {type: 'string'},
       outdir: {type: 'string', default: '.bundle-stats'},
       help: {type: 'boolean', short: 'h', default: false},
     },
@@ -36,6 +37,7 @@ Options:
   --only <pattern>     Only include matching exports (repeatable)
   --no-benchmark       Skip import time benchmarks
   --no-bundle          Skip Rollup bundling + treemap generation
+  --ref-label <label>  Label stored in the report to identify the measured ref (e.g. "main (abc12345)")
   --outdir <path>      Directory for treemap HTML artifacts (default: .bundle-stats/)
   -h, --help           Show this help message`)
     process.exit(0)
@@ -72,6 +74,10 @@ Options:
     },
     progress,
   )
+
+  if (values['ref-label']) {
+    report.refLabel = values['ref-label']
+  }
 
   // Optionally compare against a baseline
   let output: string

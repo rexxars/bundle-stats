@@ -40,6 +40,7 @@ export interface Report {
   package: string
   version: string
   timestamp: string
+  refLabel?: string
   exports: ExportReport[]
 }
 
