@@ -5,6 +5,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.3](https://github.com/rexxars/bundle-stats/compare/v1.0.2...v1.0.3) (2026-03-02)
+
+### Bug Fixes
+
+- install runtime dependencies in GitHub Action ([a5d10d8](https://github.com/rexxars/bundle-stats/commit/a5d10d8d5e000d3ab4bf1fc572736be4aa291fea))
+
 ## [1.0.2](https://github.com/rexxars/bundle-stats/compare/v1.0.1...v1.0.2) (2026-03-02)
 
 ### Bug Fixes
