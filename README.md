@@ -20,15 +20,16 @@ bundle-stats [options]
 
 ### Options
 
-| Flag                  | Description                                                 | Default          |
-| --------------------- | ----------------------------------------------------------- | ---------------- |
-| `--package <path>`    | Path to target package directory or its `package.json`      | `.`              |
-| `--format <fmt>`      | Output format: `cli`, `markdown`, or `json`                 | `cli`            |
-| `--compare <path\|->` | Baseline JSON report for delta comparison (`-` reads stdin) |                  |
-| `--ignore <pattern>`  | Glob pattern to skip exports (repeatable)                   |                  |
-| `--no-benchmark`      | Skip import time benchmarks                                 |                  |
-| `--no-bundle`         | Skip Rollup bundling and treemap generation                 |                  |
-| `--outdir <path>`     | Directory for treemap HTML artifacts                        | `.bundle-stats/` |
+| Flag                  | Description                                                       | Default          |
+| --------------------- | ----------------------------------------------------------------- | ---------------- |
+| `--package <path>`    | Path to target package directory or its `package.json`            | `.`              |
+| `--format <fmt>`      | Output format: `cli`, `markdown`, or `json`                       | `cli`            |
+| `--compare <path\|->` | Baseline JSON report for delta comparison (`-` reads stdin)       |                  |
+| `--compare-npm <ver>` | Compare against a published npm version (e.g. `latest`, `5.12.0`) |                  |
+| `--ignore <pattern>`  | Glob pattern to skip exports (repeatable)                         |                  |
+| `--no-benchmark`      | Skip import time benchmarks                                       |                  |
+| `--no-bundle`         | Skip Rollup bundling and treemap generation                       |                  |
+| `--outdir <path>`     | Directory for treemap HTML artifacts                              | `.bundle-stats/` |
 
 ### Examples
 
@@ -60,6 +61,18 @@ Pipe the baseline via stdin:
 
 ```bash
 cat baseline.json | bundle-stats --format markdown --compare -
+```
+
+Compare against the latest published npm version:
+
+```bash
+bundle-stats --compare-npm latest --format markdown
+```
+
+Compare against a specific published version:
+
+```bash
+bundle-stats --compare-npm 5.12.0
 ```
 
 Skip specific exports:
