@@ -13,7 +13,7 @@
   },
   "homepage": "https://github.com/rexxars/bundle-stats#readme",
   "bin": {
-    "bundle-stats": "./bin/bundle-stats.js"
+    "bundle-stats": "bin/bundle-stats.js"
   },
   "type": "module",
   "sideEffects": false,
