@@ -15,6 +15,32 @@ source "${SCRIPT_DIR}/build.sh"
 
 BUNDLE_STATS="node ${ACTION_ROOT}/bin/bundle-stats.ts"
 
+# --- Error trap (set up early so all failures are caught) ---
+
+ERROR_FILE="$(mktemp)"
+cleanup() {
+  rm -f "$ERROR_FILE"
+  rm -rf "${WORK_DIR:-}"
+}
+trap cleanup EXIT
+
+on_error() {
+  local error_output
+  error_output="$(cat "$ERROR_FILE" 2>/dev/null || echo 'Unknown error')"
+
+  # Always print to Actions log
+  echo "::error::${error_output}"
+
+  # Post to PR if we have enough context (PR_NUMBER may not be resolved yet)
+  if [[ -n "${PR_NUMBER:-}" ]] && [[ -n "${GITHUB_REPOSITORY:-}" ]]; then
+    post_error "$error_output"
+  fi
+
+  cleanup
+  exit 1
+}
+trap on_error ERR
+
 # --- 1. Resolve inputs ---
 
 # PR number from event JSON
@@ -41,18 +67,18 @@ fi
 HEAD_REF="${INPUT_HEAD_REF:-${GITHUB_SHA:-}}"
 
 if [[ -z "$PR_NUMBER" ]]; then
-  echo "Error: Could not determine PR number. Is this running on a pull_request event?" >&2
-  exit 1
+  echo "Could not determine PR number. Is this running on a pull_request event?" >>"$ERROR_FILE"
+  false # trigger ERR trap
 fi
 
 if [[ -z "$BASE_REF" ]]; then
-  echo "Error: Could not determine base ref. Set base-ref input or run on a pull_request event." >&2
-  exit 1
+  echo "Could not determine base ref. Set base-ref input or run on a pull_request event." >>"$ERROR_FILE"
+  false # trigger ERR trap
 fi
 
 if [[ -z "$HEAD_REF" ]]; then
-  echo "Error: Could not determine head ref." >&2
-  exit 1
+  echo "Could not determine head ref." >>"$ERROR_FILE"
+  false # trigger ERR trap
 fi
 
 echo "PR #${PR_NUMBER}: comparing ${BASE_REF:0:8}..${HEAD_REF:0:8}"
@@ -83,25 +109,7 @@ echo "Packages: ${PKG_DISPLAY}"
 
 post_calculating "$PKG_DISPLAY"
 
-# --- 4. Error trap ---
-
-ERROR_FILE="$(mktemp)"
-cleanup() {
-  rm -f "$ERROR_FILE"
-  rm -rf "${WORK_DIR:-}"
-}
-trap cleanup EXIT
-
-on_error() {
-  local error_output
-  error_output="$(cat "$ERROR_FILE" 2>/dev/null || echo 'Unknown error')"
-  post_error "$error_output"
-  cleanup
-  exit 1
-}
-trap on_error ERR
-
-# --- 5. Build CLI flags ---
+# --- 4. Build CLI flags ---
 
 CLI_FLAGS=()
 if [[ "${INPUT_NO_BENCHMARK:-false}" == "true" ]]; then
@@ -139,37 +147,41 @@ path_to_slug() {
   echo "$1" | tr '@/' '__'
 }
 
-# --- 6. Measure baseline ---
+# --- 5. Measure baseline ---
 
 WORK_DIR="$(mktemp -d)"
 
 echo "Checking out baseline: ${BASE_REF}"
-git checkout "$BASE_REF" 2>"$ERROR_FILE"
+git checkout "$BASE_REF" 2>/dev/null
 
+echo "Building baseline..." >>"$ERROR_FILE"
 run_builds "$PACKAGE_PATHS" 2>>"$ERROR_FILE"
 
 while IFS= read -r pkg_path; do
   [[ -z "$pkg_path" ]] && continue
   slug="$(path_to_slug "$pkg_path")"
   echo "Measuring baseline for ${pkg_path}..."
+  echo "Measuring baseline for ${pkg_path}" >>"$ERROR_FILE"
   $BUNDLE_STATS --package "$pkg_path" --format json "${CLI_FLAGS[@]}" > "${WORK_DIR}/baseline-${slug}.json" 2>>"$ERROR_FILE"
 done <<< "$PACKAGE_PATHS"
 
 echo "Checking out head: ${HEAD_REF}"
-git checkout "$HEAD_REF" 2>>"$ERROR_FILE"
+git checkout "$HEAD_REF" 2>/dev/null
 
-# --- 7. Measure current ---
+# --- 6. Measure current ---
 
+echo "Building head..." >>"$ERROR_FILE"
 run_builds "$PACKAGE_PATHS" 2>>"$ERROR_FILE"
 
 while IFS= read -r pkg_path; do
   [[ -z "$pkg_path" ]] && continue
   slug="$(path_to_slug "$pkg_path")"
   echo "Measuring current for ${pkg_path}..."
+  echo "Measuring current for ${pkg_path}" >>"$ERROR_FILE"
   $BUNDLE_STATS --package "$pkg_path" --format json "${CLI_FLAGS[@]}" > "${WORK_DIR}/current-${slug}.json" 2>>"$ERROR_FILE"
 done <<< "$PACKAGE_PATHS"
 
-# --- 8. Generate comparison markdown ---
+# --- 7. Generate comparison markdown ---
 
 MARKDOWN=""
 
@@ -188,7 +200,7 @@ ${pkg_md}"
   fi
 done <<< "$PACKAGE_PATHS"
 
-# --- 9. Check thresholds ---
+# --- 8. Check thresholds ---
 
 THRESHOLD_ARGS=""
 
@@ -234,7 +246,7 @@ if [[ -n "$THRESHOLD_ARGS" ]]; then
   fi
 fi
 
-# --- 10. Update comment ---
+# --- 9. Update comment ---
 
 FINAL_BODY="$MARKDOWN"
 if [[ -n "$VIOLATIONS_MD" ]]; then

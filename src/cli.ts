@@ -46,12 +46,11 @@ Options:
 
   /**
    * Write a progress message to stderr.
-   * Only emitted when format is "cli" so that stdout stays clean for piping.
+   * Always writes regardless of output format — stderr does not interfere with
+   * JSON / Markdown on stdout, and the GitHub Action captures stderr for error reporting.
    */
   function progress(message: string): void {
-    if (format === 'cli') {
-      process.stderr.write(styleText('dim', `${message}\n`))
-    }
+    process.stderr.write(styleText('dim', `${message}\n`))
   }
 
   // Resolve --package: accept a path to a directory or a package.json file
