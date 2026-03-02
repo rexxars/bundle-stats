@@ -158,6 +158,8 @@ path_to_slug() {
 
 WORK_DIR="$(mktemp -d)"
 
+echo "Fetching baseline ref: ${BASE_REF}"
+git fetch --depth=1 origin "$BASE_REF" 2>>"$ERROR_FILE"
 echo "Checking out baseline: ${BASE_REF}"
 git checkout "$BASE_REF" 2>/dev/null
 
@@ -172,6 +174,8 @@ while IFS= read -r pkg_path; do
   $BUNDLE_STATS --package "$pkg_path" --format json "${CLI_FLAGS[@]}" > "${WORK_DIR}/baseline-${slug}.json" 2>>"$ERROR_FILE"
 done <<< "$PACKAGE_PATHS"
 
+echo "Fetching head ref: ${HEAD_REF}"
+git fetch --depth=1 origin "$HEAD_REF" 2>>"$ERROR_FILE"
 echo "Checking out head: ${HEAD_REF}"
 git checkout "$HEAD_REF" 2>/dev/null
 

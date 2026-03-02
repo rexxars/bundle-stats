@@ -30,11 +30,16 @@ export function formatMarkdown(
 
   const lines: string[] = []
   if (ci) lines.push('<!-- bundle-stats-comment -->')
+  lines.push(`## 📦 Bundle Stats — \`${report.package}\``, '')
+
+  if (comparison) {
+    const date = comparison.baseline.timestamp.split('T')[0]
+    lines.push(`Compared against \`${comparison.baseline.version}\` (${date})`, '')
+  }
+
   lines.push(
-    `## 📦 Bundle Stats — \`${report.package}\``,
-    '',
-    '| Export | Internal | Bundled | Import Time |',
-    '| :----- | -------: | ------: | ----------: |',
+    '| Export | Internal bytes | Total bytes (bundled) | Import Time |',
+    '| :----- | -------------: | --------------------: | ----------: |',
   )
 
   for (const exp of report.exports) {
@@ -56,13 +61,12 @@ export function formatMarkdown(
   // Footer
   if (comparison) {
     const details = [
-      `- Compared against baseline: \`${comparison.baseline.version}\` (${comparison.baseline.timestamp})`,
       `- Import time regressions over ${IMPORT_TIME_REGRESSION_THRESHOLD}% are flagged with ⚠️`,
     ]
     if (ci)
       details.push('- Treemap artifacts are attached to the CI run for detailed size analysis')
     details.push(
-      '- Sizes shown as raw / gzip 🗜️. Internal = own code only. Bundled = with dependencies. Import time = Node.js cold-start median.',
+      '- Sizes shown as raw / gzip 🗜️. Internal bytes = own code only. Total bytes = with all dependencies. Import time = Node.js cold-start median.',
     )
     lines.push('<details>', '<summary>Details</summary>', '', ...details, '', '</details>')
   } else {
@@ -70,7 +74,7 @@ export function formatMarkdown(
     if (ci)
       footerLines.push('_Treemap artifacts are attached to the CI run for detailed size analysis._')
     footerLines.push(
-      '_Sizes shown as raw / gzip 🗜️. Internal = own code. Bundled = with deps. Import time = Node.js cold-start median._',
+      '_Sizes shown as raw / gzip 🗜️. Internal bytes = own code. Total bytes = with deps. Import time = Node.js cold-start median._',
     )
     lines.push(...footerLines)
   }
@@ -118,7 +122,7 @@ function formatSizePairCell(
 
   if (gzipDelta) {
     const deltaStr = formatDelta(gzipDelta, formatBytes)
-    const deltaSuffix = deltaStr.slice(deltaStr.indexOf(' ('))
+    const deltaSuffix = noBreakParens(deltaStr.slice(deltaStr.indexOf(' (')))
     const text = `${base}${deltaSuffix}`
     if (gzipDelta.delta > 0) return `🔺 ${text}`
     if (gzipDelta.delta < 0) return `🔽 ${text}`
@@ -139,7 +143,7 @@ function formatImportCell(
   }
 
   if (delta) {
-    const text = formatDelta(delta, formatMs)
+    const text = noBreakParens(formatDelta(delta, formatMs))
     // Slower = regression
     if (delta.delta > 0) {
       const flag = delta.percent > IMPORT_TIME_REGRESSION_THRESHOLD ? ' ⚠️' : ''
@@ -150,4 +154,9 @@ function formatImportCell(
   }
 
   return formatMs(exp.importTime.medianMs)
+}
+
+/** Prevent line breaks within parenthesized delta values, e.g. "(+0 B, +0.0%)" */
+function noBreakParens(text: string): string {
+  return text.replace(/\(([^)]+)\)/g, (match) => match.replaceAll(' ', '&nbsp;'))
 }
