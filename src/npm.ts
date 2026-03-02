@@ -31,7 +31,7 @@ export function resolveNpmVersion(packageName: string, version: string | true): 
   }
 }
 
-export interface MeasureNpmPackageOptions {
+interface MeasureNpmPackageOptions {
   packageName: string
   version: string
   reportOptions: Pick<
