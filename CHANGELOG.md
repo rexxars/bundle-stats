@@ -5,6 +5,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.1.0](https://github.com/rexxars/bundle-stats/compare/v1.0.4...v1.1.0) (2026-03-02)
+
+### Features
+
+- add --ref-label flag for baseline identification in reports ([57ae8ca](https://github.com/rexxars/bundle-stats/commit/57ae8ca14f71cae7f6f446d4212c41885bb8e41d))
+
 ## [1.0.4](https://github.com/rexxars/bundle-stats/compare/v1.0.3...v1.0.4) (2026-03-02)
 
 ### Bug Fixes
