@@ -5,6 +5,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.0.4](https://github.com/rexxars/bundle-stats/compare/v1.0.3...v1.0.4) (2026-03-02)
+
+### Bug Fixes
+
+- fetch refs before checkout, improve markdown table output ([4171f35](https://github.com/rexxars/bundle-stats/commit/4171f352c6257a1bdebb8bed0b4dc4b6c8c23150))
+
 ## [1.0.3](https://github.com/rexxars/bundle-stats/compare/v1.0.2...v1.0.3) (2026-03-02)
 
 ### Bug Fixes
