@@ -48,6 +48,7 @@ export interface ExportDelta {
   name: string
   key: string
   internalSize: DeltaValue | null
+  internalRawSize: DeltaValue | null
   bundledRawSize: DeltaValue | null
   bundledSize: DeltaValue | null
   importTime: DeltaValue | null

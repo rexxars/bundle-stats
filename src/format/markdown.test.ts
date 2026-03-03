@@ -32,6 +32,7 @@ function makeDelta(overrides: Partial<ExportDelta> = {}): ExportDelta {
     name: 'my-pkg',
     key: '.',
     internalSize: {before: 500, after: 600, delta: 100, percent: 20},
+    internalRawSize: {before: 1000, after: 1100, delta: 100, percent: 10},
     bundledRawSize: {before: 5000, after: 5500, delta: 500, percent: 10},
     bundledSize: {before: 2000, after: 2200, delta: 200, percent: 10},
     importTime: {before: 100, after: 120, delta: 20, percent: 20},
