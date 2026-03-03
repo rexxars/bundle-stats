@@ -59,33 +59,62 @@ describe('formatMarkdown', () => {
       assert.ok(md.includes('## 📦 Bundle Stats — `my-pkg`'))
     })
 
-    it('includes table header', () => {
+    it('does not include export sub-heading for single export', () => {
       const md = formatMarkdown(makeReport())
-      assert.ok(md.includes('| Export | Internal bytes | Total bytes (bundled) | Import Time |'))
-      assert.ok(md.includes('| :----- | -------------: | --------------------: | ----------: |'))
+      assert.ok(!md.includes('### '))
     })
 
-    it('renders export row with sizes and import time', () => {
-      const md = formatMarkdown(makeReport())
-      assert.ok(md.includes('| `my-pkg` |'))
-      assert.ok(md.includes('1000&nbsp;B&nbsp;/&nbsp;500&nbsp;B&nbsp;🗜️'))
-      assert.ok(md.includes('4.9&nbsp;KB&nbsp;/&nbsp;2.0&nbsp;KB&nbsp;🗜️'))
-      assert.ok(md.includes('100ms'))
+    it('includes export sub-headings for multiple exports', () => {
+      const report = makeReport({
+        exports: [
+          makeExport({name: 'my-pkg', key: '.'}),
+          makeExport({name: 'my-pkg/utils', key: './utils'}),
+        ],
+      })
+      const md = formatMarkdown(report)
+      assert.ok(md.includes('### `my-pkg`'))
+      assert.ok(md.includes('### `my-pkg/utils`'))
     })
 
-    it('renders dash for null internal size', () => {
+    it('renders metric rows table with Metric and Value columns', () => {
+      const md = formatMarkdown(makeReport())
+      assert.ok(md.includes('| Metric | Value |'))
+    })
+
+    it('renders separate rows for internal raw and gzip', () => {
+      const md = formatMarkdown(makeReport())
+      assert.ok(md.includes('| Internal (raw) | 1000&nbsp;B |'))
+      assert.ok(md.includes('| Internal (gzip) | 500&nbsp;B |'))
+    })
+
+    it('renders separate rows for bundled raw and gzip', () => {
+      const md = formatMarkdown(makeReport())
+      assert.ok(md.includes('| Bundled (raw) | 4.9&nbsp;KB |'))
+      assert.ok(md.includes('| Bundled (gzip) | 2.0&nbsp;KB |'))
+    })
+
+    it('renders import time row', () => {
+      const md = formatMarkdown(makeReport())
+      assert.ok(md.includes('| Import time | 100ms |'))
+    })
+
+    it('omits internal rows when internalSize is null', () => {
       const md = formatMarkdown(makeReport({exports: [makeExport({internalSize: null})]}))
-      assert.match(md, /\| `my-pkg` \| - \|/)
+      assert.ok(!md.includes('Internal (raw)'))
+      assert.ok(!md.includes('Internal (gzip)'))
     })
 
-    it('renders dash for null bundled size', () => {
+    it('omits bundled rows when bundledSize is null', () => {
       const md = formatMarkdown(makeReport({exports: [makeExport({bundledSize: null})]}))
-      assert.match(md, /- \| 100ms \|/)
+      assert.ok(!md.includes('Bundled (raw)'))
+      assert.ok(!md.includes('Bundled (gzip)'))
     })
 
-    it('renders dash for null import time', () => {
+    it('omits import time row when importTime is null', () => {
       const md = formatMarkdown(makeReport({exports: [makeExport({importTime: null})]}))
-      assert.match(md, /\| - \|\n/)
+      const tableRows = md.split('\n').filter((line) => line.startsWith('|'))
+      const importRow = tableRows.find((line) => line.includes('Import time'))
+      assert.equal(importRow, undefined)
     })
 
     it('renders failed import time with error', () => {
@@ -101,34 +130,22 @@ describe('formatMarkdown', () => {
         importTime: {medianMs: 0, runs: [], failed: true, error: null},
       })
       const md = formatMarkdown(makeReport({exports: [exp]}))
-      assert.ok(md.includes('| ❌ |'))
-    })
-
-    it('renders multiple exports as separate rows', () => {
-      const report = makeReport({
-        exports: [
-          makeExport({name: 'my-pkg', key: '.'}),
-          makeExport({name: 'my-pkg/utils', key: './utils'}),
-        ],
-      })
-      const md = formatMarkdown(report)
-      assert.ok(md.includes('`my-pkg`'))
-      assert.ok(md.includes('`my-pkg/utils`'))
-    })
-
-    it('includes footer note', () => {
-      const md = formatMarkdown(makeReport())
-      assert.ok(md.includes('_Sizes shown as raw / gzip'))
+      assert.ok(md.includes('| Import time | ❌ |'))
     })
 
     it('does not include comparison header when no comparison', () => {
       const md = formatMarkdown(makeReport())
       assert.ok(!md.includes('Compared against'))
     })
+
+    it('includes footer note', () => {
+      const md = formatMarkdown(makeReport())
+      assert.ok(md.includes('_Sizes shown as raw / gzip'))
+    })
   })
 
   describe('CI mode', () => {
-    it('does not include HTML comment marker (managed by action/comment.sh)', () => {
+    it('does not include HTML comment marker', () => {
       const md = formatMarkdown(makeReport(), undefined, {ci: true})
       assert.ok(!md.includes('<!-- bundle-stats-comment -->'))
     })
@@ -156,9 +173,17 @@ describe('formatMarkdown', () => {
       assert.ok(md.includes('Compared against `0.9.0` (2025-12-01)'))
     })
 
-    it('shows colored delta for size regression (red)', () => {
+    it('has comparison column in table header', () => {
+      const comp = makeComparison({
+        baseline: makeReport({refLabel: 'main'}),
+      })
+      const md = formatMarkdown(makeReport(), comp)
+      assert.ok(md.includes('| vs main |'))
+    })
+
+    it('shows colored delta for size regression (red) in delta column', () => {
       const delta = makeDelta({
-        internalSize: {before: 500, after: 600, delta: 100, percent: 20},
+        internalRawSize: {before: 1000, after: 1100, delta: 100, percent: 10},
       })
       const comp = makeComparison({
         baseline: makeReport({refLabel: 'main'}),
@@ -166,12 +191,11 @@ describe('formatMarkdown', () => {
       })
       const md = formatMarkdown(makeReport(), comp)
       assert.ok(md.includes('<font color="red">'))
-      assert.ok(md.includes('+100&nbsp;B,&nbsp;+20.0%'))
     })
 
-    it('shows colored delta for size improvement (green)', () => {
+    it('shows colored delta for size improvement (green) in delta column', () => {
       const delta = makeDelta({
-        internalSize: {before: 600, after: 500, delta: -100, percent: -16.7},
+        internalRawSize: {before: 1100, after: 1000, delta: -100, percent: -9.1},
       })
       const comp = makeComparison({
         baseline: makeReport({refLabel: 'main'}),
@@ -179,18 +203,9 @@ describe('formatMarkdown', () => {
       })
       const md = formatMarkdown(makeReport(), comp)
       assert.ok(md.includes('<font color="green">'))
-      assert.ok(md.includes('-100&nbsp;B,&nbsp;-16.7%'))
     })
 
-    it('shows "vs `label`:" prefix on comparison lines', () => {
-      const comp = makeComparison({
-        baseline: makeReport({refLabel: 'main'}),
-      })
-      const md = formatMarkdown(makeReport(), comp)
-      assert.ok(md.includes('vs&nbsp;`main`:&nbsp;'))
-    })
-
-    it('shows import time delta', () => {
+    it('shows import time delta in its own row', () => {
       const delta = makeDelta({
         importTime: {before: 100, after: 120, delta: 20, percent: 20},
       })
@@ -199,8 +214,10 @@ describe('formatMarkdown', () => {
         deltas: [delta],
       })
       const md = formatMarkdown(makeReport(), comp)
-      assert.ok(md.includes('100ms'))
-      assert.ok(md.includes('+20ms,&nbsp;+20.0%'))
+      // Import time row should contain the delta
+      const importRow = md.split('\n').find((line) => line.includes('Import time'))
+      assert.ok(importRow, 'expected an import time row')
+      assert.ok(importRow.includes('+20ms,&nbsp;+20.0%'))
     })
 
     it('flags import time regression over threshold with warning', () => {
@@ -212,7 +229,9 @@ describe('formatMarkdown', () => {
         deltas: [delta],
       })
       const md = formatMarkdown(makeReport(), comp)
-      assert.ok(md.includes('⚠️'))
+      const importRow = md.split('\n').find((line) => line.includes('Import time'))
+      assert.ok(importRow, 'expected an import time row')
+      assert.ok(importRow.includes('⚠️'))
     })
 
     it('does not flag import time regression under threshold', () => {
@@ -224,25 +243,37 @@ describe('formatMarkdown', () => {
         deltas: [delta],
       })
       const md = formatMarkdown(makeReport(), comp)
-      // ⚠️ appears in the details footer, so check it's not in the table row
-      const tableRow = md.split('\n').find((line) => line.startsWith('| `my-pkg`'))
-      assert.ok(tableRow, 'expected a table row')
-      assert.ok(!tableRow.includes('⚠️'))
+      const importRow = md.split('\n').find((line) => line.includes('Import time'))
+      assert.ok(importRow, 'expected an import time row')
+      assert.ok(!importRow.includes('⚠️'))
     })
 
-    it('shows removed exports', () => {
-      const delta = makeDelta({name: 'old-export', status: 'removed'})
+    it('shows removed exports as strikethrough line (no table)', () => {
+      const delta = makeDelta({name: 'old-export', key: './old', status: 'removed'})
       const comp = makeComparison({deltas: [delta]})
       const md = formatMarkdown(makeReport(), comp)
       assert.ok(md.includes('🗑️ ~~old-export~~'))
+      // No table row for removed export
+      assert.ok(!md.includes('| old-export'))
     })
 
-    it('shows added exports with new badge', () => {
+    it('shows added exports with new badge, delta columns show -', () => {
       const exp = makeExport({name: 'new-export', key: './new'})
       const delta = makeDelta({name: 'new-export', key: './new', status: 'added'})
       const comp = makeComparison({deltas: [delta]})
-      const md = formatMarkdown(makeReport({exports: [exp]}), comp)
+      const report = makeReport({exports: [makeExport(), exp]})
+      const md = formatMarkdown(report, comp)
       assert.ok(md.includes('🆕 `new-export`'))
+      // Find metric rows under the new-export section — delta column should be "-"
+      const lines = md.split('\n')
+      const newExportHeadingIdx = lines.findIndex((l) => l.includes('🆕 `new-export`'))
+      assert.ok(newExportHeadingIdx >= 0, 'expected new-export heading')
+      // Check a metric row after the heading has "-" in delta column
+      const metricRowAfterHeading = lines
+        .slice(newExportHeadingIdx)
+        .find((l) => l.includes('Internal (raw)'))
+      assert.ok(metricRowAfterHeading, 'expected internal raw row for new export')
+      assert.ok(metricRowAfterHeading.includes('| - |'))
     })
 
     it('includes details section with comparison', () => {
@@ -278,17 +309,26 @@ describe('formatMarkdown', () => {
       assert.ok(!md.includes('`vv1.2.3`'))
     })
 
+    it('has comparison column with npm version label', () => {
+      const npmComp = makeComparison({
+        baseline: makeReport({version: '1.2.3'}),
+      })
+      const md = formatMarkdown(makeReport(), undefined, {npmComparison: npmComp})
+      assert.ok(md.includes('| vs v1.2.3 |'))
+    })
+
     it('shows deltas against npm version', () => {
       const delta = makeDelta({
-        internalSize: {before: 600, after: 500, delta: -100, percent: -16.7},
+        internalRawSize: {before: 1100, after: 1000, delta: -100, percent: -9.1},
       })
       const npmComp = makeComparison({
         baseline: makeReport({version: '1.2.3'}),
         deltas: [delta],
       })
       const md = formatMarkdown(makeReport(), undefined, {npmComparison: npmComp})
-      assert.ok(md.includes('vs&nbsp;`v1.2.3`'))
-      assert.ok(md.includes('-100&nbsp;B'))
+      const internalRawRow = md.split('\n').find((line) => line.includes('Internal (raw)'))
+      assert.ok(internalRawRow, 'expected an internal raw row')
+      assert.ok(internalRawRow.includes('-100&nbsp;B'))
     })
   })
 
@@ -305,12 +345,26 @@ describe('formatMarkdown', () => {
       assert.ok(md.includes('`v1.0.0` (npm)'))
     })
 
-    it('shows git delta on first comparison line and npm delta on second', () => {
+    it('has both comparison columns in table header', () => {
+      const gitComp = makeComparison({
+        baseline: makeReport({refLabel: 'main'}),
+      })
+      const npmComp = makeComparison({
+        baseline: makeReport({version: '1.0.0'}),
+      })
+      const md = formatMarkdown(makeReport(), gitComp, {npmComparison: npmComp})
+      const headerLine = md.split('\n').find((line) => line.includes('Metric'))
+      assert.ok(headerLine, 'expected header line')
+      assert.ok(headerLine.includes('vs main'))
+      assert.ok(headerLine.includes('vs v1.0.0'))
+    })
+
+    it('shows git delta in first comparison column and npm delta in second', () => {
       const gitDelta = makeDelta({
-        internalSize: {before: 500, after: 600, delta: 100, percent: 20},
+        internalRawSize: {before: 1000, after: 1100, delta: 100, percent: 10},
       })
       const npmDelta = makeDelta({
-        internalSize: {before: 700, after: 500, delta: -200, percent: -28.6},
+        internalRawSize: {before: 1200, after: 1000, delta: -200, percent: -16.7},
       })
       const gitComp = makeComparison({
         baseline: makeReport({refLabel: 'main'}),
@@ -321,13 +375,15 @@ describe('formatMarkdown', () => {
         deltas: [npmDelta],
       })
       const md = formatMarkdown(makeReport(), gitComp, {npmComparison: npmComp})
-      // Git comparison line
-      assert.ok(md.includes('vs&nbsp;`main`:'))
-      // Npm comparison line
-      assert.ok(md.includes('vs&nbsp;`v1.0.0`:'))
+      const internalRawRow = md.split('\n').find((line) => line.includes('Internal (raw)'))
+      assert.ok(internalRawRow, 'expected an internal raw row')
+      // Git delta (regression)
+      assert.ok(internalRawRow.includes('<font color="red">+100&nbsp;B'))
+      // Npm delta (improvement)
+      assert.ok(internalRawRow.includes('<font color="green">-200&nbsp;B'))
     })
 
-    it('shows 🆕 for export added since npm version', () => {
+    it('shows new in npm column for export added since npm version', () => {
       const gitDelta = makeDelta({status: 'changed'})
       const npmDelta = makeDelta({status: 'added'})
       const gitComp = makeComparison({
@@ -339,13 +395,25 @@ describe('formatMarkdown', () => {
         deltas: [npmDelta],
       })
       const md = formatMarkdown(makeReport(), gitComp, {npmComparison: npmComp})
-      assert.ok(md.includes('vs&nbsp;`v1.0.0`:&nbsp;🆕'))
+      // The npm delta column should show "-" for added exports
+      const internalRawRow = md.split('\n').find((line) => line.includes('Internal (raw)'))
+      assert.ok(internalRawRow, 'expected an internal raw row')
+      // In dual mode, the npm column should show "-" for 'added' status
+      // The row format is: | metric | value | git delta | npm delta |
+      const cells = internalRawRow
+        .split('|')
+        .map((c) => c.trim())
+        .filter(Boolean)
+      // cells[3] is the npm delta column
+      assert.equal(cells[3], '-')
     })
 
-    it('omits npm delta line when delta is zero', () => {
+    it('shows - in npm column cells when npm delta is zero', () => {
       const gitDelta = makeDelta()
       const npmDelta = makeDelta({
         internalSize: {before: 500, after: 500, delta: 0, percent: 0},
+        internalRawSize: {before: 1000, after: 1000, delta: 0, percent: 0},
+        bundledRawSize: {before: 5000, after: 5000, delta: 0, percent: 0},
         bundledSize: {before: 2000, after: 2000, delta: 0, percent: 0},
         importTime: {before: 100, after: 100, delta: 0, percent: 0},
       })
@@ -358,36 +426,50 @@ describe('formatMarkdown', () => {
         deltas: [npmDelta],
       })
       const md = formatMarkdown(makeReport(), gitComp, {npmComparison: npmComp})
-      // v1.0.0 appears in the header, but should NOT appear in table rows
-      const tableRow = md.split('\n').find((line) => line.startsWith('| `my-pkg`'))
-      assert.ok(tableRow, 'expected a table row')
-      assert.ok(!tableRow.includes('v1.0.0'))
+      // Check each metric row has "-" in npm column
+      const tableRows = md.split('\n').filter((line) => line.startsWith('|'))
+      const metricRows = tableRows.filter(
+        (line) =>
+          line.includes('Internal (raw)') ||
+          line.includes('Internal (gzip)') ||
+          line.includes('Bundled (raw)') ||
+          line.includes('Bundled (gzip)') ||
+          line.includes('Import time'),
+      )
+      for (const row of metricRows) {
+        const cells = row
+          .split('|')
+          .map((c) => c.trim())
+          .filter(Boolean)
+        // cells[3] is the npm delta column
+        assert.equal(cells[3], '-', `expected "-" in npm column for row: ${row}`)
+      }
     })
   })
 
   describe('colorDelta via output', () => {
     it('uses <font color="red"> for regressions', () => {
       const delta = makeDelta({
-        internalSize: {before: 500, after: 600, delta: 100, percent: 20},
+        internalRawSize: {before: 1000, after: 1100, delta: 100, percent: 10},
       })
       const comp = makeComparison({
         baseline: makeReport({refLabel: 'main'}),
         deltas: [delta],
       })
       const md = formatMarkdown(makeReport(), comp)
-      assert.ok(md.includes('<font color="red">+100&nbsp;B,&nbsp;+20.0%</font>'))
+      assert.ok(md.includes('<font color="red">+100&nbsp;B,&nbsp;+10.0%</font>'))
     })
 
     it('uses <font color="green"> for improvements', () => {
       const delta = makeDelta({
-        internalSize: {before: 600, after: 500, delta: -100, percent: -16.7},
+        internalRawSize: {before: 1100, after: 1000, delta: -100, percent: -9.1},
       })
       const comp = makeComparison({
         baseline: makeReport({refLabel: 'main'}),
         deltas: [delta],
       })
       const md = formatMarkdown(makeReport(), comp)
-      assert.ok(md.includes('<font color="green">-100&nbsp;B,&nbsp;-16.7%</font>'))
+      assert.ok(md.includes('<font color="green">-100&nbsp;B,&nbsp;-9.1%</font>'))
     })
 
     it('does not contain LaTeX syntax', () => {

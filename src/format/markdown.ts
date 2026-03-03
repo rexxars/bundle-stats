@@ -1,4 +1,4 @@
-import type {ComparisonReport, DeltaValue, ExportDelta, ExportReport, Report} from '../types.ts'
+import type {ComparisonReport, DeltaValue, ExportDelta, Report} from '../types.ts'
 import {formatBytes, formatDeltaOnly, formatMs} from './helpers.ts'
 
 /** Threshold (percent) above which import time regressions are highlighted. */
@@ -50,16 +50,23 @@ export function formatMarkdown(
   const npmVersion = npmComparison?.baseline.refLabel ?? npmComparison?.baseline.version
   const npmVersionFormatted = npmVersion ? vPrefix(npmVersion) : undefined
 
-  // Compute the label used in "vs <label>:" delta lines
-  let baselineLabel: string | undefined
-  if (effectiveComparison) {
+  // Compute labels for comparison columns
+  let gitColumnLabel: string | undefined
+  let npmColumnLabel: string | undefined
+
+  if (hasDualComparison && comparison) {
+    gitColumnLabel = comparison.baseline.refLabel
+      ? comparison.baseline.refLabel
+      : `${comparison.baseline.version} (${comparison.baseline.timestamp.split('T')[0]})`
+    npmColumnLabel = npmVersionFormatted
+  } else if (effectiveComparison) {
     if (!comparison && npmComparison && npmVersionFormatted) {
       // npm promoted to primary
-      baselineLabel = `\`${npmVersionFormatted}\``
+      gitColumnLabel = npmVersionFormatted
     } else if (effectiveComparison.baseline.refLabel) {
-      baselineLabel = `\`${effectiveComparison.baseline.refLabel}\``
+      gitColumnLabel = effectiveComparison.baseline.refLabel
     } else {
-      baselineLabel = `\`${effectiveComparison.baseline.version}\``
+      gitColumnLabel = `${effectiveComparison.baseline.version} (${effectiveComparison.baseline.timestamp.split('T')[0]})`
     }
   }
 
@@ -69,53 +76,165 @@ export function formatMarkdown(
   // Comparison header
   if (effectiveComparison) {
     if (hasDualComparison && comparison) {
-      // Both git and npm comparisons
       const gitLabel = comparison.baseline.refLabel
         ? `\`${comparison.baseline.refLabel}\``
         : `\`${comparison.baseline.version}\` (${comparison.baseline.timestamp.split('T')[0]})`
       lines.push(`Compared against ${gitLabel} · \`${npmVersionFormatted}\` (npm)`, '')
     } else if (!comparison && npmComparison) {
-      // Only npm comparison (promoted to primary)
       lines.push(`Compared against \`${npmVersionFormatted}\` (npm)`, '')
     } else if (effectiveComparison.baseline.refLabel) {
-      // Only git comparison with ref label
       lines.push(`Compared against \`${effectiveComparison.baseline.refLabel}\``, '')
     } else {
-      // Only git comparison without ref label
       const date = effectiveComparison.baseline.timestamp.split('T')[0]
       lines.push(`Compared against \`${effectiveComparison.baseline.version}\` (${date})`, '')
     }
   }
 
-  lines.push(
-    '| Export | Internal bytes | Total bytes (bundled) | Import Time |',
-    '| :----- | -------------: | --------------------: | ----------: |',
-  )
+  const multipleExports = report.exports.length > 1
+  // Also count removed exports for the "multiple" check
+  const removedCount = effectiveComparison
+    ? effectiveComparison.deltas.filter((d) => d.status === 'removed').length
+    : 0
+  const hasMultipleSections = multipleExports || removedCount > 0
 
+  // Render each export's metric table
   for (const exp of report.exports) {
     const delta = deltasByKey.get(exp.key)
     const npmDelta = hasDualComparison ? npmDeltasByKey.get(exp.key) : undefined
-    lines.push(
-      buildRow(
-        exp,
-        delta,
-        npmDelta,
-        hasDualComparison ? npmVersion : undefined,
-        baselineLabel,
-      ),
-    )
+
+    // Sub-heading for multiple exports
+    if (hasMultipleSections) {
+      if (delta?.status === 'added') {
+        lines.push(`### 🆕 \`${exp.name}\``, '')
+      } else {
+        lines.push(`### \`${exp.name}\``, '')
+      }
+    }
+
+    // Build table header
+    const headerCells = ['Metric', 'Value']
+    const alignCells = [':----- ', ' ----:']
+    if (gitColumnLabel) {
+      headerCells.push(`vs ${gitColumnLabel}`)
+      alignCells.push(`${'-'.repeat(`vs ${gitColumnLabel}`.length)}:`)
+    }
+    if (npmColumnLabel) {
+      headerCells.push(`vs ${npmColumnLabel}`)
+      alignCells.push(`${'-'.repeat(`vs ${npmColumnLabel}`.length)}:`)
+    }
+    lines.push(`| ${headerCells.join(' | ')} |`)
+    lines.push(`| ${alignCells.join(' | ')} |`)
+
+    // Metric rows
+    const isAdded = delta?.status === 'added'
+
+    // Internal (raw)
+    if (exp.internalSize) {
+      const value = formatBytesMd(exp.internalSize.rawBytes)
+      const gitDeltaCell = formatSizeDeltaCell(delta?.internalRawSize ?? null, isAdded)
+      const npmDeltaCell = formatSizeDeltaCell(
+        npmDelta?.internalRawSize ?? null,
+        npmDelta?.status === 'added',
+      )
+      pushMetricRow(
+        lines,
+        'Internal (raw)',
+        value,
+        gitColumnLabel ? gitDeltaCell : null,
+        npmColumnLabel ? npmDeltaCell : null,
+      )
+    }
+
+    // Internal (gzip)
+    if (exp.internalSize) {
+      const value = formatBytesMd(exp.internalSize.gzipBytes)
+      const gitDeltaCell = formatSizeDeltaCell(delta?.internalSize ?? null, isAdded)
+      const npmDeltaCell = formatSizeDeltaCell(
+        npmDelta?.internalSize ?? null,
+        npmDelta?.status === 'added',
+      )
+      pushMetricRow(
+        lines,
+        'Internal (gzip)',
+        value,
+        gitColumnLabel ? gitDeltaCell : null,
+        npmColumnLabel ? npmDeltaCell : null,
+      )
+    }
+
+    // Bundled (raw)
+    if (exp.bundledSize) {
+      const value = formatBytesMd(exp.bundledSize.rawBytes)
+      const gitDeltaCell = formatSizeDeltaCell(delta?.bundledRawSize ?? null, isAdded)
+      const npmDeltaCell = formatSizeDeltaCell(
+        npmDelta?.bundledRawSize ?? null,
+        npmDelta?.status === 'added',
+      )
+      pushMetricRow(
+        lines,
+        'Bundled (raw)',
+        value,
+        gitColumnLabel ? gitDeltaCell : null,
+        npmColumnLabel ? npmDeltaCell : null,
+      )
+    }
+
+    // Bundled (gzip)
+    if (exp.bundledSize) {
+      const value = formatBytesMd(exp.bundledSize.gzipBytes)
+      const gitDeltaCell = formatSizeDeltaCell(delta?.bundledSize ?? null, isAdded)
+      const npmDeltaCell = formatSizeDeltaCell(
+        npmDelta?.bundledSize ?? null,
+        npmDelta?.status === 'added',
+      )
+      pushMetricRow(
+        lines,
+        'Bundled (gzip)',
+        value,
+        gitColumnLabel ? gitDeltaCell : null,
+        npmColumnLabel ? npmDeltaCell : null,
+      )
+    }
+
+    // Import time
+    if (exp.importTime) {
+      if (exp.importTime.failed) {
+        const errorText = exp.importTime.error ? `❌ ${exp.importTime.error}` : '❌'
+        pushMetricRow(
+          lines,
+          'Import time',
+          errorText,
+          gitColumnLabel ? '-' : null,
+          npmColumnLabel ? '-' : null,
+        )
+      } else {
+        const value = formatMs(exp.importTime.medianMs)
+        const gitDeltaCell = formatImportTimeDeltaCell(delta?.importTime ?? null, isAdded)
+        const npmDeltaCell = formatImportTimeDeltaCell(
+          npmDelta?.importTime ?? null,
+          npmDelta?.status === 'added',
+        )
+        pushMetricRow(
+          lines,
+          'Import time',
+          value,
+          gitColumnLabel ? gitDeltaCell : null,
+          npmColumnLabel ? npmDeltaCell : null,
+        )
+      }
+    }
+
+    lines.push('')
   }
 
   // Handle removed exports (only in baseline)
   if (effectiveComparison) {
     for (const d of effectiveComparison.deltas) {
       if (d.status === 'removed') {
-        lines.push(`| 🗑️ ~~${d.name}~~ | - | - | - |`)
+        lines.push(`🗑️ ~~${d.name}~~`, '')
       }
     }
   }
-
-  lines.push('')
 
   // Footer
   if (effectiveComparison) {
@@ -129,7 +248,7 @@ export function formatMarkdown(
     )
     lines.push('<details>', '<summary>Details</summary>', '', ...details, '', '</details>')
   } else {
-    const footerLines = []
+    const footerLines: string[] = []
     if (ci)
       footerLines.push('_Treemap artifacts are attached to the CI run for detailed size analysis._')
     footerLines.push(
@@ -143,125 +262,48 @@ export function formatMarkdown(
   return lines.join('\n')
 }
 
-function buildRow(
-  exp: ExportReport,
-  delta: ExportDelta | undefined,
-  npmDelta: ExportDelta | undefined,
-  npmVersion: string | undefined,
-  baselineLabel: string | undefined,
-): string {
-  const name = formatName(exp.name, delta?.status)
-  const internal = formatSizePairCell(
-    exp.internalSize ? exp.internalSize.rawBytes : null,
-    exp.internalSize ? exp.internalSize.gzipBytes : null,
-    delta?.internalSize ?? null,
-    baselineLabel,
-    npmDelta,
-    'internalSize',
-    npmVersion,
-  )
-  const bundled = formatSizePairCell(
-    exp.bundledSize ? exp.bundledSize.rawBytes : null,
-    exp.bundledSize ? exp.bundledSize.gzipBytes : null,
-    delta?.bundledSize ?? null,
-    baselineLabel,
-    npmDelta,
-    'bundledSize',
-    npmVersion,
-  )
-  const importTime = formatImportCell(exp, delta?.importTime ?? null, baselineLabel, npmDelta, npmVersion)
-
-  return `| ${name} | ${internal} | ${bundled} | ${importTime} |`
-}
-
-function formatName(name: string, status: ExportDelta['status'] | undefined): string {
-  if (status === 'added') return `🆕 \`${name}\``
-  if (status === 'removed') return `🗑️ ~~\`${name}\`~~`
-  return `\`${name}\``
+/**
+ * Push a metric row into the lines array. Delta cells are included only if non-null.
+ */
+function pushMetricRow(
+  lines: string[],
+  metricName: string,
+  value: string,
+  gitDelta: string | null,
+  npmDelta: string | null,
+): void {
+  let row = `| ${metricName} | ${value} |`
+  if (gitDelta !== null) {
+    row += ` ${gitDelta} |`
+  }
+  if (npmDelta !== null) {
+    row += ` ${npmDelta} |`
+  }
+  lines.push(row)
 }
 
 /**
- * Format a combined "raw / gzip 🗜️" size cell.
- * Delta (if present) is shown on a separate line as "vs `label`: delta".
+ * Format a size delta cell for a comparison column.
  */
-function formatSizePairCell(
-  rawBytes: number | null,
-  gzipBytes: number | null,
-  gzipDelta: DeltaValue | null,
-  baselineLabel: string | undefined,
-  npmDelta: ExportDelta | undefined,
-  field: 'internalSize' | 'bundledSize',
-  npmVersion: string | undefined,
-): string {
-  if (rawBytes == null || gzipBytes == null) return '-'
-
-  let text = `${formatBytesMd(rawBytes)}&nbsp;/&nbsp;${formatBytesMd(gzipBytes)}&nbsp;🗜️`
-
-  if (gzipDelta && baselineLabel) {
-    text = `${text}<br>${formatComparisonLine(baselineLabel, gzipDelta, formatBytesMd)}`
-  }
-
-  if (npmDelta && npmVersion) {
-    const npmLine = formatNpmDelta(npmDelta[field], npmDelta.status, npmVersion, formatBytesMd)
-    if (npmLine) text = `${text}<br>${npmLine}`
-  }
-
-  return text
+function formatSizeDeltaCell(delta: DeltaValue | null, isAdded: boolean | undefined): string {
+  if (isAdded) return '-'
+  if (!delta) return '-'
+  if (delta.delta === 0) return '-'
+  const deltaText = formatDeltaOnly(delta, formatBytesMd)
+  return colorDelta(deltaText, delta.delta)
 }
 
-function formatImportCell(
-  exp: ExportReport,
-  delta: DeltaValue | null,
-  baselineLabel: string | undefined,
-  npmDelta: ExportDelta | undefined,
-  npmVersion: string | undefined,
-): string {
-  if (exp.importTime == null) return '-'
-
-  if (exp.importTime.failed) {
-    return `❌${exp.importTime.error ? ` ${exp.importTime.error}` : ''}`
-  }
-
-  let text = formatMs(exp.importTime.medianMs)
-
-  if (delta && baselineLabel) {
-    const flag =
-      delta.delta > 0 && delta.percent > IMPORT_TIME_REGRESSION_THRESHOLD ? '&nbsp;⚠️' : ''
-    text = `${text}<br>${formatComparisonLine(baselineLabel, delta, formatMs)}${flag}`
-  }
-
-  if (npmDelta && npmVersion) {
-    const npmLine = formatNpmDelta(npmDelta.importTime, npmDelta.status, npmVersion, formatMs)
-    if (npmLine) text = `${text}<br>${npmLine}`
-  }
-
-  return text
-}
-
-/** Format a "vs `label`: colored-delta" comparison line. */
-function formatComparisonLine(
-  label: string,
-  delta: DeltaValue,
-  unitFn: (n: number) => string,
-): string {
-  const deltaText = formatDeltaOnly(delta, unitFn)
+/**
+ * Format an import time delta cell for a comparison column.
+ */
+function formatImportTimeDeltaCell(delta: DeltaValue | null, isAdded: boolean | undefined): string {
+  if (isAdded) return '-'
+  if (!delta) return '-'
+  if (delta.delta === 0) return '-'
+  const deltaText = formatDeltaOnly(delta, formatMs)
   const colored = colorDelta(deltaText, delta.delta)
-  return `vs&nbsp;${label}:&nbsp;${colored}`
-}
-
-function formatNpmDelta(
-  delta: DeltaValue | null,
-  status: ExportDelta['status'],
-  version: string,
-  unitFn: (n: number) => string,
-): string | null {
-  const label = `\`${vPrefix(version)}\``
-  if (status === 'added') return `vs&nbsp;${label}:&nbsp;🆕`
-  if (!delta) return null
-  if (delta.delta === 0) return null
-  const deltaText = formatDeltaOnly(delta, unitFn)
-  const colored = colorDelta(deltaText, delta.delta)
-  return `vs&nbsp;${label}:&nbsp;${colored}`
+  const flag = delta.delta > 0 && delta.percent > IMPORT_TIME_REGRESSION_THRESHOLD ? ' ⚠️' : ''
+  return `${colored}${flag}`
 }
 
 /**
