@@ -5,6 +5,13 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.4.0](https://github.com/rexxars/bundle-stats/compare/v1.3.2...v1.4.0) (2026-03-03)
+
+### Features
+
+- add internalRawSize delta to ExportDelta ([719e502](https://github.com/rexxars/bundle-stats/commit/719e502ac281626c9c454d5c20ad75460df4864b))
+- rewrite markdown formatter to metric-rows layout ([67b1da3](https://github.com/rexxars/bundle-stats/commit/67b1da3501049422866863a3e4f4fc7dc95cf149))
+
 ## [1.3.2](https://github.com/rexxars/bundle-stats/compare/v1.3.1...v1.3.2) (2026-03-02)
 
 ### Bug Fixes
