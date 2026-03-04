@@ -55,6 +55,7 @@ runs:
   using: 'composite'
   steps:
     - name: Run bundle stats comparison
+      id: stats
       shell: bash
       env:
         INPUT_PACKAGES: ${{ inputs.packages }}
@@ -74,4 +75,20 @@ runs:
         INPUT_COMPARE_NPM: ${{ inputs.compare-npm }}
         GITHUB_TOKEN: ${{ github.token }}
         ACTION_PATH: ${{ github.action_path }}
-      run: bash "${{ github.action_path }}/action/run.sh"
+      run: |
+        exit_code=0
+        bash "${{ github.action_path }}/action/run.sh" || exit_code=$?
+        echo "exit-code=${exit_code}" >> "$GITHUB_OUTPUT"
+
+    - name: Upload treemap artifacts
+      if: '!cancelled()'
+      uses: actions/upload-artifact@v4
+      with:
+        name: bundle-treemaps
+        path: .bundle-stats/
+        if-no-files-found: ignore
+
+    - name: Propagate result
+      if: '!cancelled()'
+      shell: bash
+      run: exit ${{ steps.stats.outputs.exit-code }}

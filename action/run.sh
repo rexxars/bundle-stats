@@ -181,7 +181,7 @@ while IFS= read -r pkg_path; do
   slug="$(path_to_slug "$pkg_path")"
   echo "Measuring baseline for ${pkg_path}..."
   echo "Measuring baseline for ${pkg_path}" >>"$ERROR_FILE"
-  $BUNDLE_STATS --package "$pkg_path" --format json --ref-label "${BASE_BRANCH:-baseline} (${BASE_REF:0:8})" "${CLI_FLAGS[@]}" > "${WORK_DIR}/baseline-${slug}.json" 2>>"$ERROR_FILE"
+  $BUNDLE_STATS --package "$pkg_path" --format json --ref-label "${BASE_BRANCH:-baseline} (${BASE_REF:0:8})" --outdir "${WORK_DIR}/treemaps" "${CLI_FLAGS[@]}" > "${WORK_DIR}/baseline-${slug}.json" 2>>"$ERROR_FILE"
 done <<< "$PACKAGE_PATHS"
 
 echo "Fetching head ref: ${HEAD_REF}"
@@ -199,7 +199,7 @@ while IFS= read -r pkg_path; do
   slug="$(path_to_slug "$pkg_path")"
   echo "Measuring current for ${pkg_path}..."
   echo "Measuring current for ${pkg_path}" >>"$ERROR_FILE"
-  $BUNDLE_STATS --package "$pkg_path" --format json "${CLI_FLAGS[@]}" > "${WORK_DIR}/current-${slug}.json" 2>>"$ERROR_FILE"
+  $BUNDLE_STATS --package "$pkg_path" --format json --outdir ".bundle-stats/${slug}" "${CLI_FLAGS[@]}" > "${WORK_DIR}/current-${slug}.json" 2>>"$ERROR_FILE"
 done <<< "$PACKAGE_PATHS"
 
 # --- 7. Generate comparison markdown ---
@@ -225,6 +225,11 @@ ${pkg_md}"
     MARKDOWN="${pkg_md}"
   fi
 done <<< "$PACKAGE_PATHS"
+
+# --- 7b. Link treemap artifacts in markdown ---
+
+RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+MARKDOWN="${MARKDOWN//Treemap artifacts are attached to the CI run/[Treemap artifacts are attached to the CI run](${RUN_URL})}"
 
 # --- 8. Check thresholds ---
 
