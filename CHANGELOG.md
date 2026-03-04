@@ -5,6 +5,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.0](https://github.com/rexxars/bundle-stats/compare/v1.5.2...v1.6.0) (2026-03-04)
+
+### Features
+
+- hosted treemap viewer with one-click links in PR comments ([482c95e](https://github.com/rexxars/bundle-stats/commit/482c95edf866b2c81e1374c7b1ff8e21f008bf4b))
+
 ## [1.5.2](https://github.com/rexxars/bundle-stats/compare/v1.5.1...v1.5.2) (2026-03-04)
 
 ### Bug Fixes
