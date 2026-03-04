@@ -22,19 +22,27 @@ ${1}"
   local comment_id
   comment_id="$(find_comment)"
 
+  # Write body to a temp file to avoid "Argument list too long" errors
+  # when the markdown is very large (e.g. packages with many exports).
+  local tmpfile
+  tmpfile="$(mktemp)"
+  printf '%s' "$body" > "$tmpfile"
+
   if [[ -n "$comment_id" ]]; then
     gh api \
       "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" \
       --method PATCH \
-      --field body="$body" \
+      --field "body=@${tmpfile}" \
       --silent
   else
     gh api \
       "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
       --method POST \
-      --field body="$body" \
+      --field "body=@${tmpfile}" \
       --silent
   fi
+
+  rm -f "$tmpfile"
 }
 
 # Post a "calculating" placeholder comment.
