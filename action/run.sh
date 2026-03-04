@@ -228,44 +228,10 @@ while IFS= read -r pkg_path; do
   # Inject treemap viewer links for this package
   TREEMAP_DIR="${GITHUB_WORKSPACE:-.}/.bundle-stats/${slug}"
   if [[ -d "$TREEMAP_DIR" ]]; then
-    encoded_md="$(printf '%s' "$pkg_md" | node --input-type=module -e "
-import {readFileSync, existsSync} from 'fs';
-import {gzipSync} from 'zlib';
-import {join} from 'path';
-const dir = process.argv[1], reportPath = process.argv[2], runUrl = process.argv[3];
-const base = 'https://rexxars.github.io/bundle-stats/';
-const bt = String.fromCharCode(96);
-let md = '';
-process.stdin.setEncoding('utf8');
-for await (const chunk of process.stdin) md += chunk;
-const report = JSON.parse(readFileSync(reportPath, 'utf8'));
-const links = [];
-for (const exp of report.exports) {
-  if (!exp.bundledSize) continue;
-  const fname = (exp.key === '.' ? 'index' : exp.key.replace(/^\\.\\//,'').replace(/\\//g,'-')) + '.html';
-  const fpath = join(dir, fname);
-  if (!existsSync(fpath)) continue;
-  const html = readFileSync(fpath, 'utf8');
-  const i = html.indexOf('const data = ');
-  if (i < 0) continue;
-  const start = i + 13;
-  const end = html.indexOf(';\\n', start);
-  if (end < 0) continue;
-  const encoded = gzipSync(html.substring(start, end)).toString('base64url');
-  if (encoded.length > 1500000) continue;
-  links.push({label: exp.key, url: base + '#data=' + encoded});
-}
-if (links.length > 0) {
-  const viewer = links.length === 1
-    ? '[View treemap](' + links[0].url + ')'
-    : links.map(l => '[' + bt + l.label + bt + '](' + l.url + ')').join(' \\u00b7 ');
-  md = md.replace(
-    'Treemap artifacts are attached to the CI run for detailed size analysis',
-    viewer + ' \\u00b7 [Artifacts](' + runUrl + ')'
-  );
-}
-process.stdout.write(md);
-" "$TREEMAP_DIR" "${WORK_DIR}/current-${slug}.json" "$RUN_URL" 2>>"$ERROR_FILE")" && pkg_md="$encoded_md"
+    encoded_md="$(printf '%s' "$pkg_md" | node "${GITHUB_ACTION_PATH}/embed-treemaps.ts" \
+      --treemap-dir "$TREEMAP_DIR" \
+      --report "${WORK_DIR}/current-${slug}.json" \
+      --run-url "$RUN_URL" 2>>"$ERROR_FILE")" && pkg_md="$encoded_md"
   fi
 
   if [[ -n "$MARKDOWN" ]]; then

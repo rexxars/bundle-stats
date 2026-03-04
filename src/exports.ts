@@ -1,5 +1,7 @@
+import {createRequire} from 'node:module'
 import {readFileSync} from 'node:fs'
 import {resolve} from 'node:path'
+import {fileURLToPath, pathToFileURL} from 'node:url'
 
 import {matchesAny} from './glob.ts'
 import type {ExportEntry} from './types.ts'
@@ -25,6 +27,7 @@ export function discoverExports(
   }
 
   const packageName = pkg.name
+  const parentUrl = pathToFileURL(pkgJsonPath).href
   const entries: ExportEntry[] = []
 
   // Normalize patterns: strip the package name prefix so that
@@ -38,7 +41,7 @@ export function discoverExports(
   const normalizedIgnore = ignorePatterns.map(normalize)
   const normalizedOnly = onlyPatterns.map(normalize)
 
-  for (const [key, value] of Object.entries(exportsMap)) {
+  for (const key of Object.keys(exportsMap)) {
     // Strip leading "./" to get the bare key for matching.
     // The root export "." keeps its key so --ignore=. can target it.
     const bareKey = key === '.' ? '.' : key.replace(/^\.\//, '')
@@ -52,14 +55,21 @@ export function discoverExports(
     // --ignore: exclude matching exports
     if (matchesAny(bareKey, normalizedIgnore)) continue
 
-    // Resolve the "default" condition
-    const defaultPath = typeof value === 'string' ? value : value?.default
-    if (!defaultPath) continue
-
-    const filePath = resolve(packagePath, defaultPath)
-    const name = key === '.' ? packageName : `${packageName}/${bareKey}`
+    // Use Node's own resolution algorithm to find the entry point,
+    // trying ESM first and falling back to CJS for require-only exports.
     const importSpecifier = key === '.' ? packageName : `${packageName}/${bareKey}`
+    let filePath: string
+    try {
+      filePath = fileURLToPath(import.meta.resolve(importSpecifier, parentUrl))
+    } catch {
+      try {
+        filePath = createRequire(pkgJsonPath).resolve(importSpecifier)
+      } catch {
+        continue
+      }
+    }
 
+    const name = key === '.' ? packageName : `${packageName}/${bareKey}`
     entries.push({key, name, filePath, importSpecifier})
   }
 

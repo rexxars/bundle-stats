@@ -3458,7 +3458,7 @@ var drawChart = (function (exports) {
                       else {
                           return (u$1("div", { children: [LABELS[sizeProp], ": ", bytesExports.format(getModuleSize(node.data, sizeProp))] }, sizeProp));
                       }
-                  }), u$1("br", {}), dataNode && dataNode.importedBy.length > 0 && (u$1("div", { children: [u$1("div", { children: [u$1("b", { children: "Imported By" }), ":"] }), dataNode.importedBy.map(({ uid }) => {
+                  }), u$1("br", {}), dataNode?.importedBy?.length > 0 && (u$1("div", { children: [u$1("div", { children: [u$1("b", { children: "Imported By" }), ":"] }), dataNode.importedBy.map(({ uid }) => {
                               const id = data.nodeMetas[uid].id;
                               return u$1("div", { children: id }, id);
                           })] })), u$1("br", {}), u$1("small", { children: data.options.sourcemap ? SOURCEMAP_RENDERED : RENDRED }), (data.options.gzip || data.options.brotli) && (u$1(k$1, { children: [u$1("br", {}), u$1("small", { children: COMPRESSED })] }))] }));
@@ -3557,7 +3557,7 @@ var drawChart = (function (exports) {
                   return 0;
               const meta = data.nodeMetas[data.nodeParts[node.uid].metaUid];
               /* eslint-disable typescript/no-non-null-asserted-optional-chain typescript/no-extra-non-null-assertion */
-              const bundleId = (_a = Object.entries(meta.moduleParts).find(([, uid]) => uid == node.uid)) === null || _a === void 0 ? void 0 : _a[0];
+              const bundleId = (_a = Object.entries(meta.moduleParts ?? {}).find(([, uid]) => uid == node.uid)) === null || _a === void 0 ? void 0 : _a[0];
               const ownSize = getModuleSize(node, sizeProperty);
               const zoomMultiplier = getNodeSizeMultiplier(node);
               const filterMultiplier = getModuleFilterMultiplier(bundleId, meta);
@@ -5027,6 +5027,7 @@ var drawChart = (function (exports) {
           currentData = JSON.parse(json);
           render(currentData);
         } catch (err) {
+          console.error(err);
           showError(err.message || String(err));
         }
       }

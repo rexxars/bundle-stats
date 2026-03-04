@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "include": ["./src", "./bin"],
+  "include": ["./src", "./bin", "./action"],
   "compilerOptions": {
     "target": "ESNext",
     "module": "Preserve",
