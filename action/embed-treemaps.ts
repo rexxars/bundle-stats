@@ -79,10 +79,19 @@ if (links.length > 0) {
       ? `[View treemap](${links[0].url})`
       : links.map((l) => `[${BACKTICK}${l.label}${BACKTICK}](${l.url})`).join(' \u00b7 ')
 
+  const treemapLine = `🗺️ ${viewer} \u00b7 [Artifacts](${runUrl})`
+
+  // Replace the placeholder with the treemap links
+  md = md.replace('<!-- treemap-links -->', treemapLine)
+
+  // Remove the now-redundant note from inside <details>
   md = md.replace(
-    'Treemap artifacts are attached to the CI run for detailed size analysis',
-    `${viewer} \u00b7 [Artifacts](${runUrl})`,
+    '- Treemap artifacts are attached to the CI run for detailed size analysis\n',
+    '',
   )
+} else {
+  // No treemap links — remove the empty placeholder
+  md = md.replace('<!-- treemap-links -->\n\n', '')
 }
 
 process.stdout.write(md)
@@ -125,10 +134,63 @@ function compactTreemapData(json: string): string {
   }
 
   for (const uid in data.nodeMetas) {
-    delete data.nodeMetas[uid].imported
-    delete data.nodeMetas[uid].isEntry
-    delete data.nodeMetas[uid].isExternal
+    const meta = data.nodeMetas[uid]
+    delete meta.imported
+    delete meta.isEntry
+    delete meta.isExternal
+    if (typeof meta.id === 'string') {
+      meta.id = simplifyPnpmId(meta.id)
+    }
   }
 
+  simplifyPnpmPaths(data.tree)
+
   return JSON.stringify(data)
+}
+
+interface TreeNode {
+  name: string
+  children?: TreeNode[]
+}
+
+/**
+ * Simplify pnpm's verbose `.pnpm/<pkg+version_hash>/node_modules/<pkg>/...` paths
+ * to just `<pkg>/...` so treemap labels are readable.
+ */
+function simplifyPnpmPaths(node: TreeNode): void {
+  if (!node.children) return
+
+  for (const child of node.children) {
+    if (child.name === 'node_modules/.pnpm') {
+      simplifyPnpmChildren(child)
+    } else {
+      simplifyPnpmPaths(child)
+    }
+  }
+}
+
+function simplifyPnpmChildren(pnpmNode: TreeNode): void {
+  if (!pnpmNode.children) return
+
+  for (const child of pnpmNode.children) {
+    const idx = child.name.indexOf('/node_modules/')
+    if (idx !== -1) {
+      child.name = child.name.slice(idx + '/node_modules/'.length)
+    }
+  }
+
+  // Rename the parent from "node_modules/.pnpm" to just "node_modules"
+  // since the children now have clean package names
+  pnpmNode.name = 'node_modules'
+}
+
+const PNPM_PATH_RE = /\/node_modules\/\.pnpm\/[^/]+\/node_modules\//g
+
+/**
+ * Simplify pnpm paths in nodeMeta `id` strings.
+ * `/node_modules/.pnpm/<hash>/node_modules/@sanity/ui/dist/theme.mjs`
+ * becomes `/node_modules/@sanity/ui/dist/theme.mjs`
+ */
+function simplifyPnpmId(id: string): string {
+  return id.replace(PNPM_PATH_RE, '/node_modules/')
 }

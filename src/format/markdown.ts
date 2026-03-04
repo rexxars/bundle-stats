@@ -236,6 +236,11 @@ export function formatMarkdown(
     }
   }
 
+  // Treemap viewer links placeholder (hoisted above details, replaced by embed-treemaps.ts)
+  if (ci) {
+    lines.push('<!-- treemap-links -->', '')
+  }
+
   // Footer
   if (effectiveComparison) {
     const details = [

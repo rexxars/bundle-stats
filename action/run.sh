@@ -243,8 +243,11 @@ ${pkg_md}"
   fi
 done <<< "$PACKAGE_PATHS"
 
-# --- 7b. Link treemap artifacts in markdown (fallback for any un-replaced notes) ---
+# --- 7b. Link treemap artifacts in markdown (fallback for any un-replaced placeholders) ---
 
+# Remove any leftover treemap placeholder that embed-treemaps didn't replace
+MARKDOWN="${MARKDOWN//$'<!-- treemap-links -->\n\n'/}"
+# Link remaining artifact notes inside <details> to the CI run
 MARKDOWN="${MARKDOWN//Treemap artifacts are attached to the CI run/[Treemap artifacts are attached to the CI run](${RUN_URL})}"
 
 # --- 8. Check thresholds ---
