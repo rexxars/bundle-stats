@@ -5,6 +5,18 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.0](https://github.com/rexxars/bundle-stats/compare/v1.6.1...v1.7.0) (2026-03-04)
+
+### Features
+
+- compact treemap data and use Node's resolver for exports ([6970618](https://github.com/rexxars/bundle-stats/commit/6970618e474f4fbfffc99628e710ebbed6858a6c))
+- hoist treemap links above details and simplify pnpm paths ([0813611](https://github.com/rexxars/bundle-stats/commit/0813611f33586b171e819e55b92beac68afb1d8b))
+
+### Bug Fixes
+
+- add embed-treemaps.ts to knip entry points ([1d9deee](https://github.com/rexxars/bundle-stats/commit/1d9deee785e804c20064370a729f0f449a4069ee))
+- gracefully handle fork PRs with read-only tokens ([fc1a7c5](https://github.com/rexxars/bundle-stats/commit/fc1a7c55bf681b3b578f88450a72356c72c966ab))
+
 ## [1.6.1](https://github.com/rexxars/bundle-stats/compare/v1.6.0...v1.6.1) (2026-03-04)
 
 ### Bug Fixes
