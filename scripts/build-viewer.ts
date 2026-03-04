@@ -150,7 +150,7 @@ ${treemapJs}
 </html>
 `
 
-const outPath = join(repoRoot, 'docs/treemap/index.html')
+const outPath = join(repoRoot, 'treemap/index.html')
 mkdirSync(dirname(outPath), {recursive: true})
 writeFileSync(outPath, html)
 console.log(`Wrote ${outPath}`)

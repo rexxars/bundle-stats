@@ -1,5 +1,4 @@
 node_modules/
 dist/
 .bundle-stats/
-docs/*
-!docs/treemap/
+docs/
