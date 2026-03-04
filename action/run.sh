@@ -40,7 +40,7 @@ on_error() {
 
   # Post to PR if we have enough context (PR_NUMBER may not be resolved yet)
   if [[ -n "${PR_NUMBER:-}" ]] && [[ -n "${GITHUB_REPOSITORY:-}" ]]; then
-    post_error "$error_output"
+    post_error "$error_output" || true
   fi
 
   cleanup
@@ -124,7 +124,7 @@ echo "Packages: ${PKG_DISPLAY}"
 
 # --- 3. Post calculating comment ---
 
-post_calculating "$PKG_DISPLAY"
+post_calculating "$PKG_DISPLAY" || true
 
 # --- 4. Build CLI flags ---
 
@@ -291,7 +291,7 @@ if [[ -n "$THRESHOLD_ARGS" ]]; then
 
   # Exit code 2 means invalid args — treat as error
   if [[ "$THRESHOLD_EXIT" -eq 2 ]]; then
-    post_error "$(cat "$ERROR_FILE" 2>/dev/null || echo 'Threshold check failed with invalid arguments')"
+    post_error "$(cat "$ERROR_FILE" 2>/dev/null || echo 'Threshold check failed with invalid arguments')" || true
     exit 1
   fi
 fi
@@ -309,7 +309,7 @@ fi
 trap cleanup EXIT
 trap - ERR
 
-upsert_comment "$FINAL_BODY"
+upsert_comment "$FINAL_BODY" || true
 
 if [[ "$THRESHOLD_EXIT" -eq 1 ]]; then
   echo "Threshold violations detected — failing the check."

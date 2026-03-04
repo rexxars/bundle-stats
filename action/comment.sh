@@ -4,6 +4,10 @@
 
 COMMENT_MARKER='<!-- bundle-stats-comment -->'
 
+# Whether the token has permission to post PR comments.
+# Starts true; set to false on first 403 (e.g. fork PRs with read-only tokens).
+CAN_COMMENT=true
+
 # Find the existing bundle-stats comment on the PR.
 # Prints the comment ID if found, or empty string.
 find_comment() {
@@ -16,11 +20,16 @@ find_comment() {
 
 # Create or update the PR comment.
 # Usage: upsert_comment "markdown body"
+# Returns 0 on success, 1 if commenting is disabled (fork PRs).
 upsert_comment() {
+  if [[ "$CAN_COMMENT" != "true" ]]; then
+    return 1
+  fi
+
   local body="${COMMENT_MARKER}
 ${1}"
   local comment_id
-  comment_id="$(find_comment)"
+  comment_id="$(find_comment 2>/dev/null)" || true
 
   # Write body to a temp file to avoid "Argument list too long" errors
   # when the markdown is very large (e.g. packages with many exports).
@@ -28,21 +37,28 @@ ${1}"
   tmpfile="$(mktemp)"
   printf '%s' "$body" > "$tmpfile"
 
+  local rc=0
   if [[ -n "$comment_id" ]]; then
     gh api \
       "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" \
       --method PATCH \
       --field "body=@${tmpfile}" \
-      --silent
+      --silent 2>/dev/null || rc=$?
   else
     gh api \
       "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
       --method POST \
       --field "body=@${tmpfile}" \
-      --silent
+      --silent 2>/dev/null || rc=$?
   fi
 
   rm -f "$tmpfile"
+
+  if [[ "$rc" -ne 0 ]]; then
+    CAN_COMMENT=false
+    echo "::warning::Unable to post PR comment (token may lack write permission, e.g. fork PRs). Results will be available as workflow artifacts only."
+    return 1
+  fi
 }
 
 # Post a "calculating" placeholder comment.
