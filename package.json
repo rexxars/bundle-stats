@@ -39,6 +39,7 @@
     "lint:fix": "eslint . --fix",
     "test": "node --test src/**/*.test.ts",
     "knip": "knip",
+    "build:viewer": "node scripts/build-viewer.ts",
     "prepublishOnly": "tsup"
   },
   "dependencies": {
