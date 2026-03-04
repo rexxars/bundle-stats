@@ -5,6 +5,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.6.1](https://github.com/rexxars/bundle-stats/compare/v1.6.0...v1.6.1) (2026-03-04)
+
+### Bug Fixes
+
+- use temp file for PR comment body to avoid ARG_MAX limit ([0e00167](https://github.com/rexxars/bundle-stats/commit/0e001674a84a93f44ad9ce5269fd492ab452e396))
+
 ## [1.6.0](https://github.com/rexxars/bundle-stats/compare/v1.5.2...v1.6.0) (2026-03-04)
 
 ### Features
