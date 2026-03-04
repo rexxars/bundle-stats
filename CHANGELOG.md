@@ -5,6 +5,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.1](https://github.com/rexxars/bundle-stats/compare/v1.5.0...v1.5.1) (2026-03-04)
+
+### Bug Fixes
+
+- use absolute paths for treemap artifact upload ([ca45a1f](https://github.com/rexxars/bundle-stats/commit/ca45a1f7d4c2cc8f13e5c0696743967d06083663))
+
 ## [1.5.0](https://github.com/rexxars/bundle-stats/compare/v1.4.0...v1.5.0) (2026-03-04)
 
 ### Features
