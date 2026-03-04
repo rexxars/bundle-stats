@@ -86,6 +86,7 @@ runs:
       with:
         name: bundle-treemaps
         path: ${{ github.workspace }}/.bundle-stats/
+        include-hidden-files: true
         if-no-files-found: ignore
 
     - name: Propagate result
