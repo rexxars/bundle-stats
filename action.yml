@@ -85,7 +85,7 @@ runs:
       uses: actions/upload-artifact@v4
       with:
         name: bundle-treemaps
-        path: .bundle-stats/
+        path: ${{ github.workspace }}/.bundle-stats/
         if-no-files-found: ignore
 
     - name: Propagate result

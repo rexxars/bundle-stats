@@ -199,8 +199,13 @@ while IFS= read -r pkg_path; do
   slug="$(path_to_slug "$pkg_path")"
   echo "Measuring current for ${pkg_path}..."
   echo "Measuring current for ${pkg_path}" >>"$ERROR_FILE"
-  $BUNDLE_STATS --package "$pkg_path" --format json --outdir ".bundle-stats/${slug}" "${CLI_FLAGS[@]}" > "${WORK_DIR}/current-${slug}.json" 2>>"$ERROR_FILE"
+  TREEMAP_DIR="${GITHUB_WORKSPACE:-.}/.bundle-stats/${slug}"
+  $BUNDLE_STATS --package "$pkg_path" --format json --outdir "$TREEMAP_DIR" "${CLI_FLAGS[@]}" > "${WORK_DIR}/current-${slug}.json" 2>>"$ERROR_FILE"
 done <<< "$PACKAGE_PATHS"
+
+# List generated treemap files for diagnostics
+echo "Treemap files:"
+find "${GITHUB_WORKSPACE:-.}/.bundle-stats" -name '*.html' 2>/dev/null || echo "  (none)"
 
 # --- 7. Generate comparison markdown ---
 
@@ -215,7 +220,7 @@ while IFS= read -r pkg_path; do
     COMPARE_NPM_FLAG=(--compare-npm "${INPUT_COMPARE_NPM}")
   fi
 
-  pkg_md="$(cat "${WORK_DIR}/baseline-${slug}.json" | $BUNDLE_STATS --package "$pkg_path" --format markdown --compare - "${COMPARE_NPM_FLAG[@]}" "${CLI_FLAGS[@]}" 2>>"$ERROR_FILE")"
+  pkg_md="$(cat "${WORK_DIR}/baseline-${slug}.json" | $BUNDLE_STATS --package "$pkg_path" --format markdown --compare - --outdir "${WORK_DIR}/treemaps" "${COMPARE_NPM_FLAG[@]}" "${CLI_FLAGS[@]}" 2>>"$ERROR_FILE")"
 
   if [[ -n "$MARKDOWN" ]]; then
     MARKDOWN="${MARKDOWN}
