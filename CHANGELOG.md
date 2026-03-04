@@ -5,6 +5,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.5.0](https://github.com/rexxars/bundle-stats/compare/v1.4.0...v1.5.0) (2026-03-04)
+
+### Features
+
+- upload artifacts to github ([53b6d38](https://github.com/rexxars/bundle-stats/commit/53b6d3867d437c0de01829c42e2a4ba3ee7782a1))
+
 ## [1.4.0](https://github.com/rexxars/bundle-stats/compare/v1.3.2...v1.4.0) (2026-03-03)
 
 ### Features
