@@ -233,7 +233,7 @@ import {readFileSync, existsSync} from 'fs';
 import {gzipSync} from 'zlib';
 import {join} from 'path';
 const dir = process.argv[1], reportPath = process.argv[2], runUrl = process.argv[3];
-const base = 'https://rexxars.github.io/bundle-stats/treemap/';
+const base = 'https://rexxars.github.io/bundle-stats/';
 const bt = String.fromCharCode(96);
 let md = '';
 process.stdin.setEncoding('utf8');
