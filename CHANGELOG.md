@@ -5,6 +5,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.1](https://github.com/rexxars/bundle-stats/compare/v1.7.0...v1.7.1) (2026-03-06)
+
+### Bug Fixes
+
+- use visual string width for CLI table column alignment ([216c1f2](https://github.com/rexxars/bundle-stats/commit/216c1f2b85e8f9aacd1dc3dffe445c20d74beab7))
+
 ## [1.7.0](https://github.com/rexxars/bundle-stats/compare/v1.6.1...v1.7.0) (2026-03-04)
 
 ### Features
