@@ -63,7 +63,7 @@ function buildTable(report: Report, comparison?: ComparisonReport): string[] {
 
   // Compute column widths from the plain text values
   const widths = COLUMNS.map((col, i) =>
-    Math.max(col.length, ...rows.map((r) => r.plain[i].length)),
+    Math.max(stringWidth(col), ...rows.map((r) => stringWidth(r.plain[i]))),
   )
 
   // Build header
@@ -178,7 +178,7 @@ function dim(text: string): string {
 
 /** Pad a plain-text string to a given width. */
 function pad(text: string, width: number): string {
-  return text + ' '.repeat(Math.max(0, width - text.length))
+  return text + ' '.repeat(Math.max(0, width - stringWidth(text)))
 }
 
 /**
@@ -186,5 +186,43 @@ function pad(text: string, width: number): string {
  * for length measurement (ANSI codes don't count towards visible width).
  */
 function padStyled(styled: string, plain: string, width: number): string {
-  return styled + ' '.repeat(Math.max(0, width - plain.length))
+  return styled + ' '.repeat(Math.max(0, width - stringWidth(plain)))
+}
+
+/**
+ * Calculate the visual width of a string in terminal columns.
+ * Unlike String.length which counts UTF-16 code units, this accounts for
+ * wide characters (emoji, CJK) taking 2 columns and zero-width characters
+ * (variation selectors, ZWJ) taking 0 columns.
+ */
+function stringWidth(str: string): number {
+  let width = 0
+  for (const ch of str) {
+    const cp = ch.codePointAt(0)!
+    if (
+      (cp >= 0xfe00 && cp <= 0xfe0f) || // Variation Selectors
+      (cp >= 0xe0100 && cp <= 0xe01ef) || // Variation Selectors Supplement
+      (cp >= 0x200b && cp <= 0x200f) || // Zero-width space, ZWNJ, ZWJ, etc.
+      (cp >= 0x2028 && cp <= 0x202e) || // Line separators, directional formatting
+      cp === 0xfeff // Zero-width no-break space (BOM)
+    ) {
+      continue
+    }
+    if (
+      cp >= 0x10000 || // Supplementary planes (emoji, etc.)
+      (cp >= 0x2e80 && cp <= 0x303e) || // CJK Radicals, Kangxi, Symbols
+      (cp >= 0x3040 && cp <= 0x33bf) || // Hiragana, Katakana, CJK Compat
+      (cp >= 0x3400 && cp <= 0x4dbf) || // CJK Extension A
+      (cp >= 0x4e00 && cp <= 0x9fff) || // CJK Unified Ideographs
+      (cp >= 0xac00 && cp <= 0xd7a3) || // Hangul Syllables
+      (cp >= 0xf900 && cp <= 0xfaff) || // CJK Compat Ideographs
+      (cp >= 0xff01 && cp <= 0xff60) || // Fullwidth Forms
+      (cp >= 0xffe0 && cp <= 0xffe6) // Fullwidth Signs
+    ) {
+      width += 2
+      continue
+    }
+    width += 1
+  }
+  return width
 }
