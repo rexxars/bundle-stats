@@ -5,6 +5,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.7.2](https://github.com/rexxars/bundle-stats/compare/v1.7.1...v1.7.2) (2026-03-06)
+
+### Bug Fixes
+
+- error on exports that cannot be resolved to files on disk ([d3c4d31](https://github.com/rexxars/bundle-stats/commit/d3c4d31e2284ed7fc7f3b66850730365290076e3))
+
 ## [1.7.1](https://github.com/rexxars/bundle-stats/compare/v1.7.0...v1.7.1) (2026-03-06)
 
 ### Bug Fixes
