@@ -29,6 +29,7 @@ export function discoverExports(
   const packageName = pkg.name
   const parentUrl = pathToFileURL(pkgJsonPath).href
   const entries: ExportEntry[] = []
+  const unresolved: string[] = []
 
   // Normalize patterns: strip the package name prefix so that
   // --ignore=sanity/desk and --ignore=desk are equivalent.
@@ -65,12 +66,20 @@ export function discoverExports(
       try {
         filePath = createRequire(pkgJsonPath).resolve(importSpecifier)
       } catch {
+        unresolved.push(key)
         continue
       }
     }
 
     const name = key === '.' ? packageName : `${packageName}/${bareKey}`
     entries.push({key, name, filePath, importSpecifier})
+  }
+
+  if (unresolved.length > 0) {
+    const list = unresolved.map((key) => `  ${key}`).join('\n')
+    throw new Error(
+      `The following exports in ${pkg.name} could not be resolved to a file on disk:\n${list}`,
+    )
   }
 
   return entries
