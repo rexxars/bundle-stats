@@ -13,6 +13,7 @@ interface BundleOptions {
   entry: ExportEntry
   externals: string[]
   outdir: string
+  exportConditions?: string[]
 }
 
 export async function measureBundledSize(options: BundleOptions): Promise<BundleResult> {
@@ -31,7 +32,7 @@ export async function measureBundledSize(options: BundleOptions): Promise<Bundle
     },
     plugins: [
       (nodeResolve as any)({
-        exportConditions: ['default', 'module', 'import'],
+        exportConditions: options.exportConditions ?? ['default', 'module', 'import'],
       }),
       (commonjs as any)(),
       (visualizer as any)({

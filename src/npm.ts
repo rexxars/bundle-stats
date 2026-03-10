@@ -36,7 +36,7 @@ interface MeasureNpmPackageOptions {
   version: string
   reportOptions: Pick<
     ReportOptions,
-    'ignorePatterns' | 'onlyPatterns' | 'noBenchmark' | 'noBundle' | 'outdir'
+    'ignorePatterns' | 'onlyPatterns' | 'conditions' | 'noBenchmark' | 'noBundle' | 'outdir'
   >
   onProgress?: ProgressCallback
 }
@@ -75,6 +75,7 @@ export async function measureNpmPackage(options: MeasureNpmPackageOptions): Prom
         packagePath,
         ignorePatterns: reportOptions.ignorePatterns,
         onlyPatterns: reportOptions.onlyPatterns,
+        conditions: reportOptions.conditions,
         noBenchmark: reportOptions.noBenchmark,
         noBundle: reportOptions.noBundle,
         outdir: reportOptions.outdir,

@@ -74,6 +74,7 @@ export interface ReportOptions {
   packagePath: string
   ignorePatterns: string[]
   onlyPatterns: string[]
+  conditions: string[]
   noBenchmark: boolean
   noBundle: boolean
   outdir: string

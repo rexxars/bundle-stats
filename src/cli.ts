@@ -18,6 +18,7 @@ export async function main(): Promise<void> {
       'compare-npm': {type: 'string'},
       ignore: {type: 'string', multiple: true, default: []},
       only: {type: 'string', multiple: true, default: []},
+      conditions: {type: 'string', multiple: true, default: []},
       'no-benchmark': {type: 'boolean', default: false},
       'no-bundle': {type: 'boolean', default: false},
       'ref-label': {type: 'string'},
@@ -38,6 +39,7 @@ Options:
   --compare-npm <ver>  Compare against a published npm version (e.g. "latest", "5.12.0")
   --ignore <pattern>   Glob pattern to skip exports (repeatable)
   --only <pattern>     Only include matching exports (repeatable)
+  --conditions <name>  Export conditions to measure separately (repeatable, e.g. --conditions node --conditions default)
   --no-benchmark       Skip import time benchmarks
   --no-bundle          Skip Rollup bundling + treemap generation
   --ref-label <label>  Label stored in the report to identify the measured ref (e.g. "main (abc12345)")
@@ -71,6 +73,7 @@ Options:
       packagePath,
       ignorePatterns: values.ignore ?? [],
       onlyPatterns: values.only ?? [],
+      conditions: values.conditions ?? [],
       noBenchmark: values['no-benchmark']!,
       noBundle: values['no-bundle']!,
       outdir: values.outdir!,
@@ -102,6 +105,7 @@ Options:
       reportOptions: {
         ignorePatterns: values.ignore ?? [],
         onlyPatterns: values.only ?? [],
+        conditions: values.conditions ?? [],
         noBenchmark: values['no-benchmark']!,
         noBundle: values['no-bundle']!,
         outdir: values.outdir!,

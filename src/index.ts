@@ -43,11 +43,12 @@ export async function generateReport(
   options: ReportOptions,
   onProgress?: ProgressCallback,
 ): Promise<Report> {
-  const {packagePath, ignorePatterns, onlyPatterns, noBenchmark, noBundle, outdir} = options
+  const {packagePath, ignorePatterns, onlyPatterns, conditions, noBenchmark, noBundle, outdir} =
+    options
   const progress = onProgress ?? (() => {})
 
   // 1. Discover exports
-  const entries = discoverExports(packagePath, ignorePatterns, onlyPatterns)
+  const entries = discoverExports(packagePath, ignorePatterns, onlyPatterns, conditions)
   progress(`Found ${entries.length} exports`)
 
   // 2. Read package metadata
@@ -79,10 +80,14 @@ export async function generateReport(
       const entry = entries[i]
       progress(`Bundling ${entry.name}...`)
       try {
+        const exportConditions = entry.condition
+          ? [entry.condition, 'import', 'default'].filter((v, i, a) => a.indexOf(v) === i)
+          : undefined
         const bundleResult = await measureBundledSize({
           entry,
           externals: peerDeps,
           outdir,
+          exportConditions,
         })
         exportReports[i].bundledSize = bundleResult
       } catch (err) {
@@ -98,6 +103,10 @@ export async function generateReport(
   if (!noBenchmark) {
     for (let i = 0; i < entries.length; i++) {
       const entry = entries[i]
+      if (entry.condition && entry.condition !== 'node') {
+        // Import benchmarks only meaningful under Node's native resolution
+        continue
+      }
       progress(`Benchmarking import ${entry.name} (${i + 1}/${entries.length})...`)
       const importResult = await measureImportTime(entry.importSpecifier, {cwd: packagePath})
       exportReports[i].importTime = importResult
