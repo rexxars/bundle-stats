@@ -82,7 +82,7 @@ export async function generateReport(
       progress(`Bundling ${entry.name}...`)
       try {
         const exportConditions = entry.condition
-          ? [entry.condition, 'import', 'default'].filter((v, i, a) => a.indexOf(v) === i)
+          ? [...new Set([entry.condition, 'import', 'default'])]
           : undefined
         const bundleResult = await measureBundledSize({
           entry,

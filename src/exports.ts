@@ -156,7 +156,11 @@ function isExportValue(value: unknown): value is ExportValue {
   if (typeof value === 'string') return true
   if (typeof value !== 'object' || value === null) return false
   return Object.values(value).every(
-    (v) => typeof v === 'string' || (typeof v === 'object' && v !== null),
+    (v) =>
+      typeof v === 'string' ||
+      (typeof v === 'object' &&
+        v !== null &&
+        Object.values(v).every((vv) => typeof vv === 'string')),
   )
 }
 
