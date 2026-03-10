@@ -3,10 +3,12 @@ export interface ExportEntry {
   key: string
   /** Friendly display name, e.g. "sanity" or "sanity/_internal" */
   name: string
-  /** Absolute path to the JS file resolved from the "default" condition */
+  /** Absolute path to the JS file resolved from the export condition */
   filePath: string
   /** The import specifier for Node resolution, e.g. "sanity" or "sanity/_internal" */
   importSpecifier: string
+  /** Export condition this entry was resolved under, e.g. "node", "default" */
+  condition?: string
 }
 
 export interface SizeResult {
