@@ -1,5 +1,6 @@
 import {styleText} from 'node:util'
 
+import {comparisonKey} from '../compare.ts'
 import type {ComparisonReport, ExportDelta, ExportReport, Report} from '../types.ts'
 import {formatBytes, formatDelta, formatMs} from './helpers.ts'
 
@@ -36,7 +37,7 @@ function buildTable(report: Report, comparison?: ComparisonReport): string[] {
   const deltasByKey = new Map<string, ExportDelta>()
   if (comparison) {
     for (const d of comparison.deltas) {
-      deltasByKey.set(d.key, d)
+      deltasByKey.set(comparisonKey(d), d)
     }
   }
 
@@ -45,7 +46,7 @@ function buildTable(report: Report, comparison?: ComparisonReport): string[] {
   const rows: Array<{plain: string[]; styled: string[]}> = []
 
   for (const exp of report.exports) {
-    const delta = deltasByKey.get(exp.key)
+    const delta = deltasByKey.get(comparisonKey(exp))
     rows.push(buildRow(exp, delta))
   }
 

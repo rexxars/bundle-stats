@@ -18,7 +18,9 @@ interface BundleOptions {
 
 export async function measureBundledSize(options: BundleOptions): Promise<BundleResult> {
   const {entry, externals, outdir} = options
-  const treemapFilename = `${entry.key === '.' ? 'index' : entry.key.replace(/^\.\//, '').replace(/\//g, '-')}.html`
+  const baseName = entry.key === '.' ? 'index' : entry.key.replace(/^\.\//, '').replace(/\//g, '-')
+  const conditionSuffix = entry.condition ? `.${entry.condition}` : ''
+  const treemapFilename = `${baseName}${conditionSuffix}.html`
   const treemapPath = resolve(outdir, treemapFilename)
 
   mkdirSync(outdir, {recursive: true})

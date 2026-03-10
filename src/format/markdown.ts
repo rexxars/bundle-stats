@@ -1,3 +1,4 @@
+import {comparisonKey} from '../compare.ts'
 import type {ComparisonReport, DeltaValue, ExportDelta, Report} from '../types.ts'
 import {formatBytes, formatDeltaOnly, formatMs} from './helpers.ts'
 
@@ -36,14 +37,14 @@ export function formatMarkdown(
   const deltasByKey = new Map<string, ExportDelta>()
   if (effectiveComparison) {
     for (const d of effectiveComparison.deltas) {
-      deltasByKey.set(d.key, d)
+      deltasByKey.set(comparisonKey(d), d)
     }
   }
 
   const npmDeltasByKey = new Map<string, ExportDelta>()
   if (hasDualComparison && npmComparison) {
     for (const d of npmComparison.deltas) {
-      npmDeltasByKey.set(d.key, d)
+      npmDeltasByKey.set(comparisonKey(d), d)
     }
   }
 
@@ -99,8 +100,8 @@ export function formatMarkdown(
 
   // Render each export's metric table
   for (const exp of report.exports) {
-    const delta = deltasByKey.get(exp.key)
-    const npmDelta = hasDualComparison ? npmDeltasByKey.get(exp.key) : undefined
+    const delta = deltasByKey.get(comparisonKey(exp))
+    const npmDelta = hasDualComparison ? npmDeltasByKey.get(comparisonKey(exp)) : undefined
 
     // Sub-heading for multiple exports
     if (hasMultipleSections) {

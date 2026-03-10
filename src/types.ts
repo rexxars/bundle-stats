@@ -33,6 +33,8 @@ export interface ExportReport {
   name: string
   key: string
   file: string
+  /** Export condition this entry was resolved under, e.g. "node", "default" */
+  condition?: string
   internalSize: SizeResult | null
   bundledSize: BundleResult | null
   importTime: ImportResult | null
@@ -49,6 +51,8 @@ export interface Report {
 export interface ExportDelta {
   name: string
   key: string
+  /** Export condition this entry was resolved under, e.g. "node", "default" */
+  condition?: string
   internalSize: DeltaValue | null
   internalRawSize: DeltaValue | null
   bundledRawSize: DeltaValue | null

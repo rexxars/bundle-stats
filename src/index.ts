@@ -16,7 +16,7 @@ export {discoverExports, readPackageJson, getPeerDependencies} from './exports.t
 export {measureInternalSize} from './measure/sizes.ts'
 export {measureBundledSize} from './measure/bundle.ts'
 export {measureImportTime} from './measure/imports.ts'
-export {compareReports} from './compare.ts'
+export {compareReports, comparisonKey} from './compare.ts'
 export {formatCli} from './format/cli.ts'
 export {formatMarkdown, type MarkdownOptions} from './format/markdown.ts'
 export {formatJson} from './format/json.ts'
@@ -66,6 +66,7 @@ export async function generateReport(
     exportReports.push({
       name: entry.name,
       key: entry.key,
+      condition: entry.condition,
       file: entry.filePath,
       internalSize,
       bundledSize: null,
