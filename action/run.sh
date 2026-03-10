@@ -158,6 +158,13 @@ if [[ -n "${INPUT_ONLY:-}" ]]; then
   done
 fi
 
+# Handle space-separated export conditions
+if [[ -n "${INPUT_CONDITIONS:-}" ]]; then
+  for cond in $INPUT_CONDITIONS; do
+    CLI_FLAGS+=(--conditions "$cond")
+  done
+fi
+
 # --- Helper: convert package path to a safe slug for filenames ---
 
 path_to_slug() {
