@@ -235,10 +235,17 @@ while IFS= read -r pkg_path; do
   # Inject treemap viewer links for this package
   TREEMAP_DIR="${GITHUB_WORKSPACE:-.}/.bundle-stats/${slug}"
   if [[ -d "$TREEMAP_DIR" ]]; then
-    encoded_md="$(printf '%s' "$pkg_md" | node "${GITHUB_ACTION_PATH}/embed-treemaps.ts" \
+    embed_err="$(mktemp)"
+    if encoded_md="$(printf '%s' "$pkg_md" | node "${GITHUB_ACTION_PATH}/embed-treemaps.ts" \
       --treemap-dir "$TREEMAP_DIR" \
       --report "${WORK_DIR}/current-${slug}.json" \
-      --run-url "$RUN_URL" 2>>"$ERROR_FILE")" && pkg_md="$encoded_md"
+      --run-url "$RUN_URL" 2>"$embed_err")"; then
+      pkg_md="$encoded_md"
+    else
+      echo "::warning::Failed to embed treemap links for ${pkg_path}"
+      cat "$embed_err" >>"$ERROR_FILE"
+    fi
+    rm -f "$embed_err"
   fi
 
   if [[ -n "$MARKDOWN" ]]; then

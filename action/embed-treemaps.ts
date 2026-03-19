@@ -22,6 +22,7 @@ import type {Report} from '../src/types.ts'
 const VIEWER_BASE = 'https://rexxars.github.io/bundle-stats/'
 const MAX_ENCODED_LENGTH = 1_500_000
 const BACKTICK = '`'
+const PNPM_PATH_RE = /\/node_modules\/\.pnpm\/[^/]+\/node_modules\//g
 
 const {values} = parseArgs({
   options: {
@@ -202,8 +203,6 @@ function simplifyPnpmChildren(pnpmNode: TreeNode): void {
   // since the children now have clean package names
   pnpmNode.name = 'node_modules'
 }
-
-const PNPM_PATH_RE = /\/node_modules\/\.pnpm\/[^/]+\/node_modules\//g
 
 /**
  * Simplify pnpm paths in nodeMeta `id` strings.
