@@ -23,3 +23,5 @@ jobs:
       - run: pnpm install --frozen-lockfile
 
       - uses: ./
+        with:
+          compare-npm: latest
