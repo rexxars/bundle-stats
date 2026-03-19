@@ -5,6 +5,21 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.0](https://github.com/rexxars/bundle-stats/compare/v1.7.2...v1.8.0) (2026-03-19)
+
+### Features
+
+- add conditions input to GitHub Action ([a45adf3](https://github.com/rexxars/bundle-stats/commit/a45adf3ce7a58ad788e6df19286fd8cd0e46a75c))
+- add export condition resolution support ([2563f07](https://github.com/rexxars/bundle-stats/commit/2563f07f9626870827abd806651c727aa5cc7575))
+- match exports by key+condition in comparisons and formatters ([94b7e75](https://github.com/rexxars/bundle-stats/commit/94b7e75ea00d28136ad66021f45ce9bec86dc1b7))
+- show fallback message for oversized treemaps, add compare tests ([ddc0171](https://github.com/rexxars/bundle-stats/commit/ddc0171d84f3fd47cd6ca687d6aec75fe8ebbde7))
+- thread export conditions through bundler, report pipeline, and CLI ([c379230](https://github.com/rexxars/bundle-stats/commit/c379230065e1812f3e813d37ac8922b316afb0d6))
+
+### Bug Fixes
+
+- make bin/bundle-stats.js executable ([916e580](https://github.com/rexxars/bundle-stats/commit/916e580621192be65a0012130529a3bb421bd921))
+- treemap embedding broken by const temporal dead zone ([a51d3e1](https://github.com/rexxars/bundle-stats/commit/a51d3e16290a91829a5e12f2c9c45d4022b1c923))
+
 ## [1.7.2](https://github.com/rexxars/bundle-stats/compare/v1.7.1...v1.7.2) (2026-03-06)
 
 ### Bug Fixes
