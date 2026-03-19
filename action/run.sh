@@ -17,14 +17,25 @@ source "${SCRIPT_DIR}/build.sh"
 # Rollup requires platform-specific native bindings so we can't bundle them.
 # We install to an isolated temp directory to avoid interfering with the user's
 # node_modules, lockfiles, or package manager setup.
-# Prefer pnpm when available — npm has a long-standing bug (npm/cli#4828) that
-# silently skips optional native binaries like @rollup/rollup-linux-x64-gnu.
-if ! node -e "import('rollup')" 2>/dev/null; then
+if ! node --input-type=module -e "await import('rollup')" 2>/dev/null; then
   BUNDLE_STATS_DEPS="$(mktemp -d)"
   node --input-type=module -e "
     import {readFileSync, writeFileSync} from 'node:fs';
+    import {platform, arch} from 'node:process';
+
     const pkg = JSON.parse(readFileSync('${ACTION_ROOT}/package.json', 'utf-8'));
-    writeFileSync('${BUNDLE_STATS_DEPS}/package.json', JSON.stringify({private: true, dependencies: pkg.dependencies}));
+    const deps = {...pkg.dependencies};
+
+    // Explicitly add rollup's platform-specific native binding as a direct
+    // dependency. Both npm and pnpm have bugs that silently skip optional
+    // native deps (npm/cli#4828), so we cannot rely on them being installed.
+    let suffix = '';
+    if (platform === 'linux') suffix = '-gnu';
+    else if (platform === 'win32') suffix = '-msvc';
+    const nativePkg = '@rollup/rollup-' + platform + '-' + arch + suffix;
+    if (deps.rollup) deps[nativePkg] = deps.rollup;
+
+    writeFileSync('${BUNDLE_STATS_DEPS}/package.json', JSON.stringify({private: true, dependencies: deps}));
   "
   if command -v pnpm &>/dev/null; then
     (cd "$BUNDLE_STATS_DEPS" && pnpm install 2>&1) || {
