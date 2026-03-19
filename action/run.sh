@@ -236,14 +236,15 @@ while IFS= read -r pkg_path; do
   TREEMAP_DIR="${GITHUB_WORKSPACE:-.}/.bundle-stats/${slug}"
   if [[ -d "$TREEMAP_DIR" ]]; then
     embed_err="$(mktemp)"
-    if encoded_md="$(printf '%s' "$pkg_md" | node "${GITHUB_ACTION_PATH}/embed-treemaps.ts" \
+    if encoded_md="$(printf '%s' "$pkg_md" | node "${ACTION_ROOT}/action/embed-treemaps.ts" \
       --treemap-dir "$TREEMAP_DIR" \
       --report "${WORK_DIR}/current-${slug}.json" \
       --run-url "$RUN_URL" 2>"$embed_err")"; then
       pkg_md="$encoded_md"
     else
-      echo "::warning::Failed to embed treemap links for ${pkg_path}"
-      cat "$embed_err" >>"$ERROR_FILE"
+      embed_detail="$(cat "$embed_err" 2>/dev/null)"
+      echo "::warning::Failed to embed treemap links for ${pkg_path}: ${embed_detail:-unknown error}"
+      echo "$embed_detail" >>"$ERROR_FILE"
     fi
     rm -f "$embed_err"
   fi
