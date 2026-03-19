@@ -58,8 +58,8 @@ ${treemapJs}
         main.innerHTML =
           '<div class="landing">' +
             "<h1>Bundle Treemap Viewer</h1>" +
-            "<p>This page renders bundle treemap data encoded in the URL hash. " +
-            "Open a treemap link from a bundle-stats PR comment to view it.</p>" +
+            "<p>This page renders bundle treemap data from a bundle-stats PR comment. " +
+            "Open a treemap link from a PR comment to view it.</p>" +
           "</div>";
       }
 
@@ -71,18 +71,17 @@ ${treemapJs}
           "</div>";
       }
 
-      function showLoading() {
+      function showLoading(msg) {
         main.innerHTML =
           '<div class="loading">' +
             '<div class="spinner"></div>' +
-            "<p>Decoding treemap data\\u2026</p>" +
+            "<p>" + (msg || "Decoding treemap data\\u2026") + "</p>" +
           "</div>";
       }
 
-      function getHashData() {
+      function getHashParams() {
         var hash = location.hash.slice(1);
-        var params = new URLSearchParams(hash);
-        return params.get("data");
+        return new URLSearchParams(hash);
       }
 
       async function decodeData(encoded) {
@@ -112,6 +111,34 @@ ${treemapJs}
         return new TextDecoder().decode(merged);
       }
 
+      async function fetchFromComment(commentUrl, exportKey) {
+        var res = await fetch(commentUrl, {
+          headers: { "Accept": "application/vnd.github.v3+json" }
+        });
+        if (!res.ok) {
+          throw new Error(
+            "Failed to fetch comment (HTTP " + res.status + "). " +
+            "This may be a private repository or the comment was deleted."
+          );
+        }
+        var data = await res.json();
+        var body = data.body || "";
+        var marker = "<!-- treemap-data:" + exportKey + " ";
+        var start = body.indexOf(marker);
+        if (start < 0) {
+          throw new Error(
+            "Treemap data for '" + exportKey + "' not found in comment. " +
+            "The comment may have been edited or the data was too large to embed."
+          );
+        }
+        var payloadStart = start + marker.length;
+        var end = body.indexOf(" -->", payloadStart);
+        if (end < 0) {
+          throw new Error("Malformed treemap data block in comment.");
+        }
+        return body.substring(payloadStart, end);
+      }
+
       function render(data) {
         main.innerHTML = "";
         var width = window.innerWidth;
@@ -122,12 +149,31 @@ ${treemapJs}
       var currentData = null;
 
       async function load() {
-        var encoded = getHashData();
-        if (!encoded) {
+        var params = getHashParams();
+        var inlineData = params.get("data");
+        var commentUrl = params.get("comment");
+        var exportKey = params.get("export");
+
+        var encoded;
+
+        if (inlineData) {
+          // Mode 1: data embedded directly in URL
+          showLoading();
+          encoded = inlineData;
+        } else if (commentUrl && exportKey) {
+          // Mode 2: fetch from GitHub comment
+          showLoading("Fetching treemap data\\u2026");
+          try {
+            encoded = await fetchFromComment(commentUrl, exportKey);
+          } catch (err) {
+            showError(err.message || String(err));
+            return;
+          }
+        } else {
           showLanding();
           return;
         }
-        showLoading();
+
         try {
           var json = await decodeData(encoded);
           currentData = JSON.parse(json);
