@@ -13,12 +13,43 @@ source "${SCRIPT_DIR}/workspace.sh"
 # shellcheck source=action/build.sh
 source "${SCRIPT_DIR}/build.sh"
 
-# Install action's own runtime dependencies (rollup, plugins, prettier)
-# These aren't bundled because rollup requires platform-specific native bindings
-(cd "$ACTION_ROOT" && npm install --omit=dev --no-audit --no-fund 2>&1) || {
-  echo "::error::Failed to install bundle-stats dependencies"
-  exit 1
-}
+# Install action's own runtime dependencies (rollup, plugins, prettier).
+# Rollup requires platform-specific native bindings so we can't bundle them.
+# We install to an isolated temp directory to avoid interfering with the user's
+# node_modules, lockfiles, or package manager setup.
+if ! node --input-type=module -e "await import('rollup')" 2>/dev/null; then
+  BUNDLE_STATS_DEPS="$(mktemp -d)"
+  node --input-type=module -e "
+    import {readFileSync, writeFileSync} from 'node:fs';
+    import {platform, arch} from 'node:process';
+
+    const pkg = JSON.parse(readFileSync('${ACTION_ROOT}/package.json', 'utf-8'));
+    const deps = {...pkg.dependencies};
+
+    // Explicitly add rollup's platform-specific native binding as a direct
+    // dependency. Both npm and pnpm have bugs that silently skip optional
+    // native deps (npm/cli#4828), so we cannot rely on them being installed.
+    let suffix = '';
+    if (platform === 'linux') suffix = '-gnu';
+    else if (platform === 'win32') suffix = '-msvc';
+    const nativePkg = '@rollup/rollup-' + platform + '-' + arch + suffix;
+    if (deps.rollup) deps[nativePkg] = deps.rollup;
+
+    writeFileSync('${BUNDLE_STATS_DEPS}/package.json', JSON.stringify({private: true, dependencies: deps}));
+  "
+  if command -v pnpm &>/dev/null; then
+    (cd "$BUNDLE_STATS_DEPS" && pnpm install 2>&1) || {
+      echo "::error::Failed to install bundle-stats dependencies"
+      exit 1
+    }
+  else
+    (cd "$BUNDLE_STATS_DEPS" && npm install --no-audit --no-fund 2>&1) || {
+      echo "::error::Failed to install bundle-stats dependencies"
+      exit 1
+    }
+  fi
+  export NODE_PATH="${BUNDLE_STATS_DEPS}/node_modules${NODE_PATH:+:$NODE_PATH}"
+fi
 
 BUNDLE_STATS="node ${ACTION_ROOT}/bin/bundle-stats.ts"
 
@@ -28,6 +59,7 @@ ERROR_FILE="$(mktemp)"
 cleanup() {
   rm -f "$ERROR_FILE"
   rm -rf "${WORK_DIR:-}"
+  rm -rf "${BUNDLE_STATS_DEPS:-}"
 }
 trap cleanup EXIT
 

@@ -125,6 +125,7 @@ function runSingleImport(specifier: string, cwd: string): number | {error: strin
       [
         '--permission',
         ...readablePaths.map((p) => `--allow-fs-read=${p}`),
+        '--allow-addons',
         '--input-type=module',
         '-e',
         script,
