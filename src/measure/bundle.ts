@@ -3,6 +3,7 @@ import {resolve} from 'node:path'
 import {gzipSync} from 'node:zlib'
 
 import commonjs from '@rollup/plugin-commonjs'
+import json from '@rollup/plugin-json'
 import nodeResolve from '@rollup/plugin-node-resolve'
 import {rollup} from 'rollup'
 import {visualizer} from 'rollup-plugin-visualizer'
@@ -36,6 +37,7 @@ export async function measureBundledSize(options: BundleOptions): Promise<Bundle
       (nodeResolve as any)({
         exportConditions: options.exportConditions ?? ['default', 'module', 'import'],
       }),
+      (json as any)(),
       (commonjs as any)(),
       (visualizer as any)({
         filename: treemapPath,
