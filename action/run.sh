@@ -13,14 +13,22 @@ source "${SCRIPT_DIR}/workspace.sh"
 # shellcheck source=action/build.sh
 source "${SCRIPT_DIR}/build.sh"
 
-# Install action's own runtime dependencies (rollup, plugins, prettier)
-# These aren't bundled because rollup requires platform-specific native bindings.
-# Skip if deps are already installed (e.g. when used locally via `uses: ./`).
+# Install action's own runtime dependencies (rollup, plugins, prettier).
+# Rollup requires platform-specific native bindings so we can't bundle them.
+# We install to an isolated temp directory to avoid interfering with the user's
+# node_modules, lockfiles, or package manager setup.
 if ! node -e "import('rollup')" 2>/dev/null; then
-  (cd "$ACTION_ROOT" && npm install --omit=dev --no-audit --no-fund 2>&1) || {
+  BUNDLE_STATS_DEPS="$(mktemp -d)"
+  node --input-type=module -e "
+    import {readFileSync, writeFileSync} from 'node:fs';
+    const pkg = JSON.parse(readFileSync('${ACTION_ROOT}/package.json', 'utf-8'));
+    writeFileSync('${BUNDLE_STATS_DEPS}/package.json', JSON.stringify({private: true, dependencies: pkg.dependencies}));
+  "
+  (cd "$BUNDLE_STATS_DEPS" && npm install --no-audit --no-fund 2>&1) || {
     echo "::error::Failed to install bundle-stats dependencies"
     exit 1
   }
+  export NODE_PATH="${BUNDLE_STATS_DEPS}/node_modules${NODE_PATH:+:$NODE_PATH}"
 fi
 
 BUNDLE_STATS="node ${ACTION_ROOT}/bin/bundle-stats.ts"
@@ -31,6 +39,7 @@ ERROR_FILE="$(mktemp)"
 cleanup() {
   rm -f "$ERROR_FILE"
   rm -rf "${WORK_DIR:-}"
+  rm -rf "${BUNDLE_STATS_DEPS:-}"
 }
 trap cleanup EXIT
 
