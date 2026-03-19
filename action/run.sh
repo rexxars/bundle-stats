@@ -17,6 +17,8 @@ source "${SCRIPT_DIR}/build.sh"
 # Rollup requires platform-specific native bindings so we can't bundle them.
 # We install to an isolated temp directory to avoid interfering with the user's
 # node_modules, lockfiles, or package manager setup.
+# Prefer pnpm when available — npm has a long-standing bug (npm/cli#4828) that
+# silently skips optional native binaries like @rollup/rollup-linux-x64-gnu.
 if ! node -e "import('rollup')" 2>/dev/null; then
   BUNDLE_STATS_DEPS="$(mktemp -d)"
   node --input-type=module -e "
@@ -24,10 +26,17 @@ if ! node -e "import('rollup')" 2>/dev/null; then
     const pkg = JSON.parse(readFileSync('${ACTION_ROOT}/package.json', 'utf-8'));
     writeFileSync('${BUNDLE_STATS_DEPS}/package.json', JSON.stringify({private: true, dependencies: pkg.dependencies}));
   "
-  (cd "$BUNDLE_STATS_DEPS" && npm install --no-audit --no-fund 2>&1) || {
-    echo "::error::Failed to install bundle-stats dependencies"
-    exit 1
-  }
+  if command -v pnpm &>/dev/null; then
+    (cd "$BUNDLE_STATS_DEPS" && pnpm install 2>&1) || {
+      echo "::error::Failed to install bundle-stats dependencies"
+      exit 1
+    }
+  else
+    (cd "$BUNDLE_STATS_DEPS" && npm install --no-audit --no-fund 2>&1) || {
+      echo "::error::Failed to install bundle-stats dependencies"
+      exit 1
+    }
+  fi
   export NODE_PATH="${BUNDLE_STATS_DEPS}/node_modules${NODE_PATH:+:$NODE_PATH}"
 fi
 
