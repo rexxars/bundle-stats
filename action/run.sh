@@ -14,11 +14,14 @@ source "${SCRIPT_DIR}/workspace.sh"
 source "${SCRIPT_DIR}/build.sh"
 
 # Install action's own runtime dependencies (rollup, plugins, prettier)
-# These aren't bundled because rollup requires platform-specific native bindings
-(cd "$ACTION_ROOT" && npm install --omit=dev --no-audit --no-fund 2>&1) || {
-  echo "::error::Failed to install bundle-stats dependencies"
-  exit 1
-}
+# These aren't bundled because rollup requires platform-specific native bindings.
+# Skip if deps are already installed (e.g. when used locally via `uses: ./`).
+if ! node -e "import('rollup')" 2>/dev/null; then
+  (cd "$ACTION_ROOT" && npm install --omit=dev --no-audit --no-fund 2>&1) || {
+    echo "::error::Failed to install bundle-stats dependencies"
+    exit 1
+  }
+fi
 
 BUNDLE_STATS="node ${ACTION_ROOT}/bin/bundle-stats.ts"
 
