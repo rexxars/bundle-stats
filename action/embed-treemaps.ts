@@ -20,7 +20,12 @@ import {gzipSync} from 'node:zlib'
 import type {Report} from '../src/types.ts'
 
 const VIEWER_BASE = 'https://rexxars.github.io/bundle-stats/'
-const MAX_ENCODED_LENGTH = 1_500_000
+// GitHub's markdown renderer silently drops links when the URL is too long,
+// rendering just the link text without making it clickable. The exact threshold
+// is undocumented — 43K URLs are known to fail. 10K is a conservative limit
+// that keeps the total comment body manageable for multi-package reports.
+// Treemaps exceeding this get an artifact link instead.
+const MAX_ENCODED_LENGTH = 10_000
 const BACKTICK = '`'
 const PNPM_PATH_RE = /\/node_modules\/\.pnpm\/[^/]+\/node_modules\//g
 
