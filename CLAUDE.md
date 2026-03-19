@@ -73,3 +73,4 @@ Composite action defined in `action.yml` with shell scripts:
 - `tsconfig.json` uses `erasableSyntaxOnly: true` and `allowImportingTsExtensions: true` for Node 24 native TS
 - pnpm as package manager
 - Release via `semantic-release` with `@sanity/semantic-release-preset`
+- PR titles must use [Conventional Commits](https://www.conventionalcommits.org/) style: `fix:`, `feat:`, `test:`, `refactor:`, `chore:`, `docs:`, `ci:`, `perf:`, `build:`, `style:`. The type prefix is lowercase, followed by a colon and space, then a short imperative description (e.g. `fix: correct treemap path resolution`). This is required because `semantic-release` parses PR titles to determine version bumps.
