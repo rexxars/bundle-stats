@@ -54,6 +54,7 @@ interface TreemapLink {
 }
 
 const links: TreemapLink[] = []
+const oversized: string[] = []
 
 for (const exp of report.exports) {
   if (!exp.bundledSize) continue
@@ -68,18 +69,36 @@ for (const exp of report.exports) {
 
   const compacted = compactTreemapData(json)
   const encoded = gzipSync(compacted).toString('base64url')
-  if (encoded.length > MAX_ENCODED_LENGTH) continue
+  if (encoded.length > MAX_ENCODED_LENGTH) {
+    oversized.push(exp.key)
+    continue
+  }
 
   links.push({label: exp.key, url: `${VIEWER_BASE}#data=${encoded}`})
 }
 
-if (links.length > 0) {
-  const viewer =
-    links.length === 1
-      ? `[View treemap](${links[0].url})`
-      : links.map((l) => `[${BACKTICK}${l.label}${BACKTICK}](${l.url})`).join(' \u00b7 ')
+if (links.length > 0 || oversized.length > 0) {
+  const parts: string[] = []
 
-  const treemapLine = `🗺️ ${viewer} \u00b7 [Artifacts](${runUrl})`
+  if (links.length > 0) {
+    const viewer =
+      links.length === 1
+        ? `[View treemap](${links[0].url})`
+        : links.map((l) => `[${BACKTICK}${l.label}${BACKTICK}](${l.url})`).join(' \u00b7 ')
+    parts.push(viewer)
+  }
+
+  if (oversized.length > 0) {
+    const label =
+      oversized.length === 1
+        ? `${BACKTICK}${oversized[0]}${BACKTICK} treemap too large to embed`
+        : `${oversized.length} treemaps too large to embed`
+    parts.push(label)
+  }
+
+  parts.push(`[Artifacts](${runUrl})`)
+
+  const treemapLine = `🗺️ ${parts.join(' · ')}`
 
   // Replace the placeholder with the treemap links
   md = md.replace('<!-- treemap-links -->', treemapLine)
