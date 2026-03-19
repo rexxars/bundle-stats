@@ -5,6 +5,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.8.1](https://github.com/rexxars/bundle-stats/compare/v1.8.0...v1.8.1) (2026-03-19)
+
+### Bug Fixes
+
+- correct embed-treemaps script path and add error details to warning ([#1](https://github.com/rexxars/bundle-stats/issues/1)) ([0031181](https://github.com/rexxars/bundle-stats/commit/0031181c9241b3dfba6be166e626623e4346061f))
+
 ## [1.8.0](https://github.com/rexxars/bundle-stats/compare/v1.7.2...v1.8.0) (2026-03-19)
 
 ### Features
