@@ -5,6 +5,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.9.2](https://github.com/rexxars/bundle-stats/compare/v1.9.1...v1.9.2) (2026-03-20)
+
+### Bug Fixes
+
+- always install deps to temp dir, skip symlink when node_modules exists ([#9](https://github.com/rexxars/bundle-stats/issues/9)) ([eff76c0](https://github.com/rexxars/bundle-stats/commit/eff76c0292908407ef9576cf8ee8709a9bc60148))
+
 ## [1.9.1](https://github.com/rexxars/bundle-stats/compare/v1.9.0...v1.9.1) (2026-03-20)
 
 ### Bug Fixes
