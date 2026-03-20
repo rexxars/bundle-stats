@@ -62,8 +62,10 @@ ERROR_FILE="$(mktemp)"
 cleanup() {
   rm -f "$ERROR_FILE"
   rm -rf "${WORK_DIR:-}"
-  rm -f "${ACTION_ROOT}/node_modules"  # symlink to temp deps
-  rm -rf "${BUNDLE_STATS_DEPS:-}"
+  if [[ -n "${BUNDLE_STATS_DEPS:-}" ]]; then
+    rm -f "${ACTION_ROOT}/node_modules"  # symlink to temp deps
+    rm -rf "${BUNDLE_STATS_DEPS}"
+  fi
 }
 trap cleanup EXIT
 
