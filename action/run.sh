@@ -17,7 +17,7 @@ source "${SCRIPT_DIR}/build.sh"
 # Rollup requires platform-specific native bindings so we can't bundle them.
 # We install to an isolated temp directory to avoid interfering with the user's
 # node_modules, lockfiles, or package manager setup.
-if ! node --input-type=module -e "await import('rollup')" 2>/dev/null; then
+if ! node --input-type=module -e "await import('rollup'); await import('@rollup/plugin-commonjs'); await import('@rollup/plugin-node-resolve'); await import('@rollup/plugin-json'); await import('rollup-plugin-visualizer')" 2>/dev/null; then
   BUNDLE_STATS_DEPS="$(mktemp -d)"
   node --input-type=module -e "
     import {readFileSync, writeFileSync} from 'node:fs';
@@ -48,7 +48,10 @@ if ! node --input-type=module -e "await import('rollup')" 2>/dev/null; then
       exit 1
     }
   fi
-  export NODE_PATH="${BUNDLE_STATS_DEPS}/node_modules${NODE_PATH:+:$NODE_PATH}"
+  # Node's ESM resolver does not use NODE_PATH — it only walks up node_modules
+  # directories from the importing file. Symlink node_modules into the action
+  # root so that imports from src/ can find the installed dependencies.
+  ln -s "${BUNDLE_STATS_DEPS}/node_modules" "${ACTION_ROOT}/node_modules"
 fi
 
 BUNDLE_STATS="node ${ACTION_ROOT}/bin/bundle-stats.ts"
@@ -59,6 +62,7 @@ ERROR_FILE="$(mktemp)"
 cleanup() {
   rm -f "$ERROR_FILE"
   rm -rf "${WORK_DIR:-}"
+  rm -f "${ACTION_ROOT}/node_modules"  # symlink to temp deps
   rm -rf "${BUNDLE_STATS_DEPS:-}"
 }
 trap cleanup EXIT
