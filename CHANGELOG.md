@@ -5,6 +5,17 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.9.0](https://github.com/rexxars/bundle-stats/compare/v1.8.1...v1.9.0) (2026-03-20)
+
+### Features
+
+- comment-based treemap embedding for large payloads ([#5](https://github.com/rexxars/bundle-stats/issues/5)) ([f250d1c](https://github.com/rexxars/bundle-stats/commit/f250d1cf38d432aae9e6bd96161d76659fefc380))
+
+### Bug Fixes
+
+- add @rollup/plugin-json to support JSON imports in bundles ([e1a959a](https://github.com/rexxars/bundle-stats/commit/e1a959ad256989b1e0b76d89188b4456f12b4558))
+- handle multi-line imports in internal size measurement ([7fae7b4](https://github.com/rexxars/bundle-stats/commit/7fae7b46ac914763a6108019df3afd489748a741))
+
 ## [1.8.1](https://github.com/rexxars/bundle-stats/compare/v1.8.0...v1.8.1) (2026-03-19)
 
 ### Bug Fixes
