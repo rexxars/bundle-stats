@@ -15,42 +15,44 @@ source "${SCRIPT_DIR}/build.sh"
 
 # Install action's own runtime dependencies (rollup, plugins, prettier).
 # Rollup requires platform-specific native bindings so we can't bundle them.
-# We install to an isolated temp directory to avoid interfering with the user's
-# node_modules, lockfiles, or package manager setup.
-if ! node --input-type=module -e "await import('rollup'); await import('@rollup/plugin-commonjs'); await import('@rollup/plugin-node-resolve'); await import('@rollup/plugin-json'); await import('rollup-plugin-visualizer')" 2>/dev/null; then
-  BUNDLE_STATS_DEPS="$(mktemp -d)"
-  node --input-type=module -e "
-    import {readFileSync, writeFileSync} from 'node:fs';
-    import {platform, arch} from 'node:process';
+# We always install to an isolated temp directory to ensure we get the exact
+# versions we need, regardless of what the target repo might have installed.
+BUNDLE_STATS_DEPS="$(mktemp -d)"
+node --input-type=module -e "
+  import {readFileSync, writeFileSync} from 'node:fs';
+  import {platform, arch} from 'node:process';
 
-    const pkg = JSON.parse(readFileSync('${ACTION_ROOT}/package.json', 'utf-8'));
-    const deps = {...pkg.dependencies};
+  const pkg = JSON.parse(readFileSync('${ACTION_ROOT}/package.json', 'utf-8'));
+  const deps = {...pkg.dependencies};
 
-    // Explicitly add rollup's platform-specific native binding as a direct
-    // dependency. Both npm and pnpm have bugs that silently skip optional
-    // native deps (npm/cli#4828), so we cannot rely on them being installed.
-    let suffix = '';
-    if (platform === 'linux') suffix = '-gnu';
-    else if (platform === 'win32') suffix = '-msvc';
-    const nativePkg = '@rollup/rollup-' + platform + '-' + arch + suffix;
-    if (deps.rollup) deps[nativePkg] = deps.rollup;
+  // Explicitly add rollup's platform-specific native binding as a direct
+  // dependency. Both npm and pnpm have bugs that silently skip optional
+  // native deps (npm/cli#4828), so we cannot rely on them being installed.
+  let suffix = '';
+  if (platform === 'linux') suffix = '-gnu';
+  else if (platform === 'win32') suffix = '-msvc';
+  const nativePkg = '@rollup/rollup-' + platform + '-' + arch + suffix;
+  if (deps.rollup) deps[nativePkg] = deps.rollup;
 
-    writeFileSync('${BUNDLE_STATS_DEPS}/package.json', JSON.stringify({private: true, dependencies: deps}));
-  "
-  if command -v pnpm &>/dev/null; then
-    (cd "$BUNDLE_STATS_DEPS" && pnpm install 2>&1) || {
-      echo "::error::Failed to install bundle-stats dependencies"
-      exit 1
-    }
-  else
-    (cd "$BUNDLE_STATS_DEPS" && npm install --no-audit --no-fund 2>&1) || {
-      echo "::error::Failed to install bundle-stats dependencies"
-      exit 1
-    }
-  fi
-  # Node's ESM resolver does not use NODE_PATH — it only walks up node_modules
-  # directories from the importing file. Symlink node_modules into the action
-  # root so that imports from src/ can find the installed dependencies.
+  writeFileSync('${BUNDLE_STATS_DEPS}/package.json', JSON.stringify({private: true, dependencies: deps}));
+"
+if command -v pnpm &>/dev/null; then
+  (cd "$BUNDLE_STATS_DEPS" && pnpm install 2>&1) || {
+    echo "::error::Failed to install bundle-stats dependencies"
+    exit 1
+  }
+else
+  (cd "$BUNDLE_STATS_DEPS" && npm install --no-audit --no-fund 2>&1) || {
+    echo "::error::Failed to install bundle-stats dependencies"
+    exit 1
+  }
+fi
+# Node's ESM resolver does not use NODE_PATH — it only walks up node_modules
+# directories from the importing file. Symlink node_modules into the action
+# root so that imports from src/ can find the installed dependencies.
+# Skip if node_modules already exists (e.g. self-test CI where deps are
+# already installed in the repo checkout).
+if [[ ! -e "${ACTION_ROOT}/node_modules" ]]; then
   ln -s "${BUNDLE_STATS_DEPS}/node_modules" "${ACTION_ROOT}/node_modules"
 fi
 
@@ -62,10 +64,11 @@ ERROR_FILE="$(mktemp)"
 cleanup() {
   rm -f "$ERROR_FILE"
   rm -rf "${WORK_DIR:-}"
-  if [[ -n "${BUNDLE_STATS_DEPS:-}" ]]; then
-    rm -f "${ACTION_ROOT}/node_modules"  # symlink to temp deps
-    rm -rf "${BUNDLE_STATS_DEPS}"
+  # Only remove node_modules if it's our symlink, not a real directory
+  if [[ -L "${ACTION_ROOT}/node_modules" ]]; then
+    rm -f "${ACTION_ROOT}/node_modules"
   fi
+  rm -rf "${BUNDLE_STATS_DEPS:-}"
 }
 trap cleanup EXIT
 
