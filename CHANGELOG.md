@@ -5,6 +5,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.9.3](https://github.com/rexxars/bundle-stats/compare/v1.9.2...v1.9.3) (2026-03-20)
+
+### Bug Fixes
+
+- handle multi-package treemaps correctly in PR comments ([#10](https://github.com/rexxars/bundle-stats/issues/10)) ([3a9fd7d](https://github.com/rexxars/bundle-stats/commit/3a9fd7d4b71952061408a49e891a691caeeb2821))
+
 ## [1.9.2](https://github.com/rexxars/bundle-stats/compare/v1.9.1...v1.9.2) (2026-03-20)
 
 ### Bug Fixes
