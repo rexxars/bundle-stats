@@ -42,9 +42,9 @@ export function measureInternalSize(entryPath: string): SizeResult {
   return {rawBytes: totalRaw, gzipBytes}
 }
 
-const IMPORT_RE = /(?:import|export)\s+.*?\s+from\s+['"](\.[^'"]+)['"]/g
+const IMPORT_RE = /(?:import|export)\s+[\s\S]*?\s+from\s+['"](\.[^'"]+)['"]/g
 
-function parseRelativeImports(content: string): string[] {
+export function parseRelativeImports(content: string): string[] {
   const imports: string[] = []
   let match: RegExpExecArray | null
   while ((match = IMPORT_RE.exec(content)) !== null) {
