@@ -264,23 +264,6 @@ while IFS= read -r pkg_path; do
 
   pkg_md="$(cat "${WORK_DIR}/baseline-${slug}.json" | $BUNDLE_STATS --package "$pkg_path" --format markdown --compare - --outdir "${WORK_DIR}/treemaps" "${COMPARE_NPM_FLAG[@]}" "${CLI_FLAGS[@]}" 2>>"$ERROR_FILE")"
 
-  # Inject treemap viewer links for this package
-  TREEMAP_DIR="${GITHUB_WORKSPACE:-.}/.bundle-stats/${slug}"
-  if [[ -d "$TREEMAP_DIR" ]]; then
-    embed_err="$(mktemp)"
-    if encoded_md="$(printf '%s' "$pkg_md" | node "${ACTION_ROOT}/action/embed-treemaps.ts" \
-      --treemap-dir "$TREEMAP_DIR" \
-      --report "${WORK_DIR}/current-${slug}.json" \
-      --run-url "$RUN_URL" 2>"$embed_err")"; then
-      pkg_md="$encoded_md"
-    else
-      embed_detail="$(cat "$embed_err" 2>/dev/null)"
-      echo "::warning::Failed to embed treemap links for ${pkg_path}: ${embed_detail:-unknown error}"
-      echo "$embed_detail" >>"$ERROR_FILE"
-    fi
-    rm -f "$embed_err"
-  fi
-
   if [[ -n "$MARKDOWN" ]]; then
     MARKDOWN="${MARKDOWN}
 
@@ -289,13 +272,6 @@ ${pkg_md}"
     MARKDOWN="${pkg_md}"
   fi
 done <<< "$PACKAGE_PATHS"
-
-# --- 7b. Link treemap artifacts in markdown (fallback for any un-replaced placeholders) ---
-
-# Remove any leftover treemap placeholder that embed-treemaps didn't replace
-MARKDOWN="${MARKDOWN//$'<!-- treemap-links -->\n\n'/}"
-# Link remaining artifact notes inside <details> to the CI run
-MARKDOWN="${MARKDOWN//Treemap artifacts are attached to the CI run/[Treemap artifacts are attached to the CI run](${RUN_URL})}"
 
 # --- 8. Check thresholds ---
 
@@ -343,7 +319,7 @@ if [[ -n "$THRESHOLD_ARGS" ]]; then
   fi
 fi
 
-# --- 9. Update comment ---
+# --- 9. First pass: post comment to get comment ID ---
 
 FINAL_BODY="$MARKDOWN"
 if [[ -n "$VIOLATIONS_MD" ]]; then
@@ -352,11 +328,43 @@ if [[ -n "$VIOLATIONS_MD" ]]; then
 ${VIOLATIONS_MD}"
 fi
 
-# Reset error trap before final comment — we handle failure ourselves now
+# Reset error trap before comment operations — we handle failure ourselves now
 trap cleanup EXIT
 trap - ERR
 
-upsert_comment "$FINAL_BODY" || true
+COMMENT_ID="$(upsert_comment "$FINAL_BODY")" || true
+
+# --- 10. Second pass: embed treemaps and update comment ---
+
+if [[ -n "$COMMENT_ID" ]]; then
+  # Build treemap dir + report pairs for embed-treemaps
+  EMBED_TREEMAP_ARGS=()
+  while IFS= read -r pkg_path; do
+    [[ -z "$pkg_path" ]] && continue
+    slug="$(path_to_slug "$pkg_path")"
+    TREEMAP_DIR="${GITHUB_WORKSPACE:-.}/.bundle-stats/${slug}"
+    if [[ -d "$TREEMAP_DIR" ]]; then
+      EMBED_TREEMAP_ARGS+=(--treemap-dir "$TREEMAP_DIR" --report "${WORK_DIR}/current-${slug}.json")
+    fi
+  done <<< "$PACKAGE_PATHS"
+
+  if [[ ${#EMBED_TREEMAP_ARGS[@]} -gt 0 ]]; then
+    embed_err="$(mktemp)"
+    if enriched="$(printf '%s' "$FINAL_BODY" | node "${ACTION_ROOT}/action/embed-treemaps.ts" \
+      "${EMBED_TREEMAP_ARGS[@]}" \
+      --run-url "$RUN_URL" \
+      --comment-id "$COMMENT_ID" \
+      --repo "${GITHUB_REPOSITORY}" \
+      --visibility "${REPO_VISIBILITY:-public}" 2>"$embed_err")"; then
+      # Update the comment with treemap data embedded
+      upsert_comment "$enriched" > /dev/null || true
+    else
+      embed_detail="$(cat "$embed_err" 2>/dev/null)"
+      echo "::warning::Failed to embed treemap links: ${embed_detail:-unknown error}"
+    fi
+    rm -f "$embed_err"
+  fi
+fi
 
 if [[ "$THRESHOLD_EXIT" -eq 1 ]]; then
   echo "Threshold violations detected — failing the check."

@@ -20,6 +20,7 @@ find_comment() {
 
 # Create or update the PR comment.
 # Usage: upsert_comment "markdown body"
+# Prints the comment ID to stdout on success.
 # Returns 0 on success, 1 if commenting is disabled (fork PRs).
 upsert_comment() {
   if [[ "$CAN_COMMENT" != "true" ]]; then
@@ -38,18 +39,19 @@ ${1}"
   printf '%s' "$body" > "$tmpfile"
 
   local rc=0
+  local result_id=""
   if [[ -n "$comment_id" ]]; then
-    gh api \
+    result_id="$(gh api \
       "repos/${GITHUB_REPOSITORY}/issues/comments/${comment_id}" \
       --method PATCH \
       --field "body=@${tmpfile}" \
-      --silent 2>/dev/null || rc=$?
+      --jq '.id' 2>/dev/null)" || rc=$?
   else
-    gh api \
+    result_id="$(gh api \
       "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
       --method POST \
       --field "body=@${tmpfile}" \
-      --silent 2>/dev/null || rc=$?
+      --jq '.id' 2>/dev/null)" || rc=$?
   fi
 
   rm -f "$tmpfile"
@@ -59,6 +61,8 @@ ${1}"
     echo "::warning::Unable to post PR comment (token may lack write permission, e.g. fork PRs). Results will be available as workflow artifacts only."
     return 1
   fi
+
+  echo "$result_id"
 }
 
 # Post a "calculating" placeholder comment.
