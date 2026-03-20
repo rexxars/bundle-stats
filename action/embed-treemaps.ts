@@ -92,15 +92,21 @@ interface TreemapEmbed {
   encoded: string
 }
 
-const links: TreemapLink[] = []
-const embeds: TreemapEmbed[] = []
-const oversized: string[] = []
+interface PackageTreemaps {
+  links: TreemapLink[]
+  embeds: TreemapEmbed[]
+  oversized: string[]
+}
 
-// Process all reports across all treemap dirs
+const multiPackage = treemapDirs.length > 1
+const packages: PackageTreemaps[] = []
+
+// Process each report separately to keep per-package treemap state
 for (let dirIdx = 0; dirIdx < treemapDirs.length; dirIdx++) {
   const treemapDir = treemapDirs[dirIdx]
   const reportPath = reportPaths[dirIdx]
   const report = JSON.parse(readFileSync(reportPath, 'utf8')) as Report
+  const pkg: PackageTreemaps = {links: [], embeds: [], oversized: []}
 
   for (const exp of report.exports) {
     if (!exp.bundledSize) continue
@@ -117,86 +123,102 @@ for (let dirIdx = 0; dirIdx < treemapDirs.length; dirIdx++) {
     const compacted = compactTreemapData(json)
     const encoded = gzipSync(compacted).toString('base64url')
 
+    // In multi-package mode, scope the data key with package name to avoid
+    // collisions when multiple packages export the same key (e.g. ".")
+    const dataKey = multiPackage ? `${report.package}:${exp.key}` : exp.key
+
     if (encoded.length <= MAX_INLINE_LENGTH) {
       // Tier 1: small enough for inline URL
-      links.push({label: exp.key, url: `${VIEWER_BASE}#data=${encoded}`})
+      pkg.links.push({label: exp.key, url: `${VIEWER_BASE}#data=${encoded}`})
     } else if (isPublic && commentApiUrl) {
       // Tier 2: embed in comment, link via API
-      embeds.push({key: exp.key, encoded})
-      const exportParam = encodeURIComponent(exp.key)
+      pkg.embeds.push({key: dataKey, encoded})
+      const exportParam = encodeURIComponent(dataKey)
       const commentParam = encodeURIComponent(commentApiUrl)
-      links.push({
+      pkg.links.push({
         label: exp.key,
         url: `${VIEWER_BASE}#comment=${commentParam}&export=${exportParam}`,
       })
     } else {
       // Tier 3: too large and private/no comment ID — artifact fallback
-      oversized.push(exp.key)
+      pkg.oversized.push(exp.key)
+    }
+  }
+
+  packages.push(pkg)
+}
+
+// Check total size budget for embeds across all packages
+const allEmbeds = packages.flatMap((p) => p.embeds)
+let totalEmbedSize = allEmbeds.reduce((sum, e) => sum + e.encoded.length + e.key.length + 25, 0)
+if (md.length + totalEmbedSize > MAX_COMMENT_BODY) {
+  // Over budget — drop embeds from largest to smallest until we fit
+  const sorted = [...allEmbeds].sort((a, b) => b.encoded.length - a.encoded.length)
+  for (const embed of sorted) {
+    if (md.length + totalEmbedSize <= MAX_COMMENT_BODY) break
+    totalEmbedSize -= embed.encoded.length + embed.key.length + 25
+    // Find which package owns this embed and remove it
+    for (const pkg of packages) {
+      const idx = pkg.embeds.indexOf(embed)
+      if (idx < 0) continue
+      pkg.embeds.splice(idx, 1)
+      const linkIdx = pkg.links.findIndex(
+        (l) =>
+          l.url.includes(`export=${encodeURIComponent(embed.key)}`) && l.url.includes('comment='),
+      )
+      if (linkIdx >= 0) pkg.links.splice(linkIdx, 1)
+      pkg.oversized.push(embed.key)
+      break
     }
   }
 }
 
-// Check total size budget for embeds
-let totalEmbedSize = embeds.reduce((sum, e) => sum + e.encoded.length + e.key.length + 25, 0)
-if (md.length + totalEmbedSize > MAX_COMMENT_BODY) {
-  // Over budget — drop embeds from largest to smallest until we fit,
-  // moving them to oversized
-  const sorted = [...embeds].sort((a, b) => b.encoded.length - a.encoded.length)
-  for (const embed of sorted) {
-    if (md.length + totalEmbedSize <= MAX_COMMENT_BODY) break
-    totalEmbedSize -= embed.encoded.length + embed.key.length + 25
-    const idx = embeds.indexOf(embed)
-    embeds.splice(idx, 1)
-    // Remove corresponding link and add to oversized
-    const linkIdx = links.findIndex(
-      (l) =>
-        l.url.includes(`export=${encodeURIComponent(embed.key)}`) && l.url.includes('comment='),
-    )
-    if (linkIdx >= 0) links.splice(linkIdx, 1)
-    oversized.push(embed.key)
-  }
-}
+// Replace each <!-- treemap-links --> placeholder with the corresponding package's links
+let placeholderIdx = 0
+md = md.replace(/<!-- treemap-links -->/g, () => {
+  const pkg = packages[placeholderIdx++]
+  if (!pkg || (pkg.links.length === 0 && pkg.oversized.length === 0)) return ''
 
-if (links.length > 0 || oversized.length > 0) {
   const parts: string[] = []
 
-  if (links.length > 0) {
+  if (pkg.links.length > 0) {
     const viewer =
-      links.length === 1
-        ? `[View treemap](${links[0].url})`
-        : links.map((l) => `[${BACKTICK}${l.label}${BACKTICK}](${l.url})`).join(' \u00b7 ')
+      pkg.links.length === 1
+        ? `[View treemap](${pkg.links[0].url})`
+        : pkg.links.map((l) => `[${BACKTICK}${l.label}${BACKTICK}](${l.url})`).join(' \u00b7 ')
     parts.push(viewer)
   }
 
-  if (oversized.length > 0) {
+  if (pkg.oversized.length > 0) {
     const label =
-      oversized.length === 1
-        ? `${BACKTICK}${oversized[0]}${BACKTICK} treemap too large to embed`
-        : `${oversized.length} treemaps too large to embed`
+      pkg.oversized.length === 1
+        ? `${BACKTICK}${pkg.oversized[0]}${BACKTICK} treemap too large to embed`
+        : `${pkg.oversized.length} treemaps too large to embed`
     parts.push(label)
   }
 
   parts.push(`[Artifacts](${runUrl})`)
 
-  const treemapLine = `🗺️ ${parts.join(' · ')}`
+  return `🗺️ ${parts.join(' · ')}`
+})
 
-  // Replace the placeholder with the treemap links
-  md = md.replace('<!-- treemap-links -->', treemapLine)
+// Remove the now-redundant treemap artifact notes from inside <details>
+md = md.replaceAll(
+  '- Treemap artifacts are attached to the CI run for detailed size analysis\n',
+  '',
+)
 
-  // Remove the now-redundant note from inside <details>
-  md = md.replace(
-    '- Treemap artifacts are attached to the CI run for detailed size analysis\n',
-    '',
-  )
-} else {
-  // No treemap links — remove the empty placeholder
-  md = md.replace('<!-- treemap-links -->\n\n', '')
-}
+// Remove redundant standalone treemap artifact notes
+md = md.replaceAll(
+  '_Treemap artifacts are attached to the CI run for detailed size analysis._\n',
+  '',
+)
 
-// Append hidden data blocks for comment-embedded treemaps
-if (embeds.length > 0) {
+// Append hidden data blocks for comment-embedded treemaps across all packages
+const remainingEmbeds = packages.flatMap((p) => p.embeds)
+if (remainingEmbeds.length > 0) {
   md += '\n'
-  for (const embed of embeds) {
+  for (const embed of remainingEmbeds) {
     md += `\n<!-- treemap-data:${embed.key} ${embed.encoded} -->`
   }
 }
