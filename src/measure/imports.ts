@@ -1,5 +1,6 @@
 import {execFileSync} from 'node:child_process'
 import {existsSync, readFileSync} from 'node:fs'
+import {tmpdir} from 'node:os'
 import path from 'node:path'
 
 import type {ImportResult} from '../types.ts'
@@ -125,6 +126,8 @@ function runSingleImport(specifier: string, cwd: string): number | {error: strin
       [
         '--permission',
         ...readablePaths.map((p) => `--allow-fs-read=${p}`),
+        `--allow-fs-read=${tmpdir()}${path.sep}`,
+        `--allow-fs-write=${tmpdir()}${path.sep}`,
         '--allow-addons',
         '--input-type=module',
         '-e',
