@@ -5,6 +5,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.9.4](https://github.com/rexxars/bundle-stats/compare/v1.9.3...v1.9.4) (2026-03-25)
+
+### Bug Fixes
+
+- allow temp dir access in import benchmark sandbox ([#11](https://github.com/rexxars/bundle-stats/issues/11)) ([47dd692](https://github.com/rexxars/bundle-stats/commit/47dd692c843aa7efb1d14535d37c3960cd71b058))
+
 ## [1.9.3](https://github.com/rexxars/bundle-stats/compare/v1.9.2...v1.9.3) (2026-03-20)
 
 ### Bug Fixes
