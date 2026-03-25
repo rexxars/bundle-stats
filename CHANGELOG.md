@@ -5,6 +5,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.9.5](https://github.com/rexxars/bundle-stats/compare/v1.9.4...v1.9.5) (2026-03-25)
+
+### Bug Fixes
+
+- skip native .node addons when bundling ([#12](https://github.com/rexxars/bundle-stats/issues/12)) ([49e19a0](https://github.com/rexxars/bundle-stats/commit/49e19a0d87b25bb29624afbfa5d5c63d81dfbab0))
+
 ## [1.9.4](https://github.com/rexxars/bundle-stats/compare/v1.9.3...v1.9.4) (2026-03-25)
 
 ### Bug Fixes
