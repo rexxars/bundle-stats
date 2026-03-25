@@ -29,6 +29,8 @@ export async function measureBundledSize(options: BundleOptions): Promise<Bundle
   const bundle = await rollup({
     input: entry.filePath,
     external: (id) => {
+      // Native addons (.node files) are binary and cannot be bundled
+      if (id.endsWith('.node')) return true
       // Externalize peer deps and anything matching them as a prefix
       if (externals.some((ext) => id === ext || id.startsWith(`${ext}/`))) return true
       return false
