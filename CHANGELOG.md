@@ -5,6 +5,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.10.1](https://github.com/rexxars/bundle-stats/compare/v1.10.0...v1.10.1) (2026-03-26)
+
+### Bug Fixes
+
+- skip --only filter for bin entries when no bin: patterns are specified ([#15](https://github.com/rexxars/bundle-stats/issues/15)) ([9105a04](https://github.com/rexxars/bundle-stats/commit/9105a0424f1152ad2f26ec6592bf27f4543b00c7))
+
 ## [1.10.0](https://github.com/rexxars/bundle-stats/compare/v1.9.6...v1.10.0) (2026-03-26)
 
 ### Features
