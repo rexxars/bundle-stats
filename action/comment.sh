@@ -2,7 +2,11 @@
 # PR comment management functions.
 # Sourced by run.sh — expects GITHUB_REPOSITORY and PR_NUMBER in the environment.
 
-COMMENT_MARKER='<!-- bundle-stats-comment -->'
+# Legacy marker for backward compatibility with existing PR comments.
+LEGACY_COMMENT_MARKER='<!-- bundle-stats-comment -->'
+# Current marker — overridden by run.sh after package resolution to include
+# a unique suffix (package names or explicit comment-id input).
+COMMENT_MARKER="$LEGACY_COMMENT_MARKER"
 
 # Whether the token has permission to post PR comments.
 # Starts true; set to false on first 403 (e.g. fork PRs with read-only tokens).
@@ -14,7 +18,7 @@ find_comment() {
   gh api \
     "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
     --paginate \
-    --jq ".[] | select(.body | startswith(\"${COMMENT_MARKER}\")) | .id" \
+    --jq ".[] | select(.body | (startswith(\"${COMMENT_MARKER}\") or startswith(\"${LEGACY_COMMENT_MARKER}\"))) | .id" \
   | head -n1
 }
 

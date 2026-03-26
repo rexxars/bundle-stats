@@ -163,6 +163,16 @@ done <<< "$PACKAGE_PATHS"
 
 echo "Packages: ${PKG_DISPLAY}"
 
+# --- Set unique comment marker ---
+# Use explicit comment-id if provided, otherwise derive from package names.
+# This prevents collisions when multiple bundle-stats invocations target
+# the same PR, or when other bots use --edit-last on github-actions[bot] comments.
+if [[ -n "${INPUT_COMMENT_ID:-}" ]]; then
+  COMMENT_MARKER="<!-- bundle-stats:${INPUT_COMMENT_ID} -->"
+else
+  COMMENT_MARKER="<!-- bundle-stats:${PKG_DISPLAY} -->"
+fi
+
 # --- 3. Post calculating comment ---
 
 post_calculating "$PKG_DISPLAY" || true

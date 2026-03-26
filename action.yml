@@ -53,6 +53,9 @@ inputs:
   compare-npm:
     description: 'Compare against a published npm version. Use "latest" or a specific version like "5.12.0".'
     default: ''
+  comment-id:
+    description: 'Unique identifier for the PR comment. Prevents collisions when multiple bundle-stats actions run on the same PR, or when other bots edit github-actions comments. Defaults to the resolved package names.'
+    default: ''
 
 runs:
   using: 'composite'
@@ -77,6 +80,7 @@ runs:
         INPUT_NO_BUNDLE: ${{ inputs.no-bundle }}
         INPUT_CONDITIONS: ${{ inputs.conditions }}
         INPUT_COMPARE_NPM: ${{ inputs.compare-npm }}
+        INPUT_COMMENT_ID: ${{ inputs.comment-id }}
         GITHUB_TOKEN: ${{ github.token }}
         ACTION_PATH: ${{ github.action_path }}
         REPO_VISIBILITY: ${{ github.event.repository.visibility }}
