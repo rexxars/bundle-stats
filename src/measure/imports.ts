@@ -18,10 +18,11 @@ function findReadablePaths(startDir: string): string[] {
   const paths: string[] = [startDir + path.sep]
   let dir = path.resolve(startDir)
   while (dir !== path.dirname(dir)) {
-    const nm = path.join(dir, 'node_modules')
-    if (existsSync(nm)) {
-      paths.push(nm + path.sep)
-    }
+    // Always allow node_modules at every ancestor level, even if it doesn't
+    // exist yet. Node's module resolver tries to stat node_modules in every
+    // parent directory, and the --permission sandbox blocks the check even
+    // for non-existent directories. Allowing them is harmless.
+    paths.push(path.join(dir, 'node_modules') + path.sep)
     if (isWorkspaceRoot(dir)) {
       // Allow the entire workspace root — this covers symlinked sibling
       // packages that live outside node_modules (e.g. packages/*).
