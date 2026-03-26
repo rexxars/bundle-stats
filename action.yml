@@ -47,6 +47,9 @@ inputs:
   no-bundle:
     description: 'Skip Rollup bundling.'
     default: 'false'
+  no-bin-benchmark:
+    description: 'Skip import time benchmarks for bin entries.'
+    default: 'false'
   conditions:
     description: 'Space-separated export conditions to measure separately (e.g. "node default").'
     default: ''
@@ -78,6 +81,7 @@ runs:
         INPUT_ONLY: ${{ inputs.only }}
         INPUT_NO_BENCHMARK: ${{ inputs.no-benchmark }}
         INPUT_NO_BUNDLE: ${{ inputs.no-bundle }}
+        INPUT_NO_BIN_BENCHMARK: ${{ inputs.no-bin-benchmark }}
         INPUT_CONDITIONS: ${{ inputs.conditions }}
         INPUT_COMPARE_NPM: ${{ inputs.compare-npm }}
         INPUT_COMMENT_ID: ${{ inputs.comment-id }}

@@ -10,15 +10,13 @@ interface PackageJson {
   name: string
   version: string
   exports?: Record<string, unknown>
+  bin?: string | Record<string, string>
   peerDependencies?: Record<string, string>
 }
 
 type ExportValue = string | Record<string, string | Record<string, string>>
 
-export function resolveExportCondition(
-  exportValue: ExportValue,
-  condition: string,
-): string | null {
+export function resolveExportCondition(exportValue: ExportValue, condition: string): string | null {
   if (typeof exportValue === 'string') {
     return condition === 'default' ? exportValue : null
   }
@@ -43,6 +41,9 @@ export function discoverExports(
   const exportsMap = pkg.exports
 
   if (!exportsMap) {
+    if (pkg.bin) {
+      return []
+    }
     throw new Error(`No "exports" field found in ${pkgJsonPath}`)
   }
 
@@ -147,6 +148,44 @@ export function discoverExports(
     throw new Error(
       `The following exports in ${pkg.name} could not be resolved to a file on disk:\n${list}`,
     )
+  }
+
+  return entries
+}
+
+export function discoverBins(
+  packagePath: string,
+  ignorePatterns: string[],
+  onlyPatterns: string[],
+): ExportEntry[] {
+  const pkgJsonPath = resolve(packagePath, 'package.json')
+  const pkg: PackageJson = JSON.parse(readFileSync(pkgJsonPath, 'utf-8'))
+
+  if (!pkg.bin) return []
+
+  // Normalize bin to object form
+  const binMap: Record<string, string> =
+    typeof pkg.bin === 'string' ? {[pkg.name]: pkg.bin} : pkg.bin
+
+  const entries: ExportEntry[] = []
+
+  for (const [binName, relativePath] of Object.entries(binMap)) {
+    const key = `bin:${binName}`
+
+    // Apply ignore/only filtering using the key
+    if (onlyPatterns.length > 0 && !matchesAny(key, onlyPatterns)) continue
+    if (matchesAny(key, ignorePatterns)) continue
+
+    const filePath = resolve(packagePath, relativePath)
+    if (!existsSync(filePath)) continue
+
+    entries.push({
+      key,
+      name: key,
+      filePath,
+      importSpecifier: filePath,
+      source: 'bin',
+    })
   }
 
   return entries

@@ -1,2 +1,2 @@
-import { foo } from "./chunk-a.js";
-export { foo };
+import {foo} from './chunk-a.js'
+export {foo}

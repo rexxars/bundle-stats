@@ -4,7 +4,7 @@ import {mkdtempSync, writeFileSync, mkdirSync, rmSync} from 'node:fs'
 import {join} from 'node:path'
 import {tmpdir} from 'node:os'
 
-import {discoverExports, resolveExportCondition} from './exports.ts'
+import {discoverExports, resolveExportCondition, discoverBins} from './exports.ts'
 
 describe('discoverExports', () => {
   let tempDir: string
@@ -30,11 +30,14 @@ describe('discoverExports', () => {
       }),
     )
 
-    assert.throws(() => discoverExports(tempDir, []), (err: unknown) => {
-      if (!(err instanceof Error)) return false
-      // Should mention both unresolved exports
-      return err.message.includes('.') && err.message.includes('./utils')
-    })
+    assert.throws(
+      () => discoverExports(tempDir, []),
+      (err: unknown) => {
+        if (!(err instanceof Error)) return false
+        // Should mention both unresolved exports
+        return err.message.includes('.') && err.message.includes('./utils')
+      },
+    )
   })
 
   it('throws listing only the missing exports, not the resolvable ones', () => {
@@ -53,11 +56,14 @@ describe('discoverExports', () => {
       }),
     )
 
-    assert.throws(() => discoverExports(tempDir, []), (err: unknown) => {
-      if (!(err instanceof Error)) return false
-      // Should mention the missing export but not the resolved one
-      return err.message.includes('./missing') && !err.message.includes('"."')
-    })
+    assert.throws(
+      () => discoverExports(tempDir, []),
+      (err: unknown) => {
+        if (!(err instanceof Error)) return false
+        // Should mention the missing export but not the resolved one
+        return err.message.includes('./missing') && !err.message.includes('"."')
+      },
+    )
   })
 
   it('returns entries normally when all exports resolve', () => {
@@ -181,6 +187,22 @@ describe('discoverExports', () => {
     assert.equal(entries[1].condition, undefined)
     assert.ok(entries[1].filePath.endsWith('utils.js'))
   })
+
+  it('returns empty array instead of throwing when exports is missing but bin exists', () => {
+    mkdirSync(join(tempDir, 'dist'), {recursive: true})
+    writeFileSync(join(tempDir, 'dist', 'cli.js'), 'console.log("hi")')
+    writeFileSync(
+      join(tempDir, 'package.json'),
+      JSON.stringify({
+        name: 'test-pkg',
+        version: '1.0.0',
+        bin: './dist/cli.js',
+      }),
+    )
+
+    const entries = discoverExports(tempDir, [])
+    assert.equal(entries.length, 0)
+  })
 })
 
 describe('resolveExportCondition', () => {
@@ -224,5 +246,149 @@ describe('resolveExportCondition', () => {
       node: {require: './dist/node.cjs'},
     }
     assert.equal(resolveExportCondition(exportValue, 'node'), null)
+  })
+})
+
+describe('discoverBins', () => {
+  let tempDir: string
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'bundle-stats-test-'))
+  })
+
+  afterEach(() => {
+    rmSync(tempDir, {recursive: true, force: true})
+  })
+
+  it('discovers string bin form', () => {
+    mkdirSync(join(tempDir, 'dist'), {recursive: true})
+    writeFileSync(join(tempDir, 'dist', 'cli.js'), '#!/usr/bin/env node\nconsole.log("hi")')
+    writeFileSync(
+      join(tempDir, 'package.json'),
+      JSON.stringify({
+        name: 'test-pkg',
+        version: '1.0.0',
+        bin: './dist/cli.js',
+      }),
+    )
+
+    const entries = discoverBins(tempDir, [], [])
+    assert.equal(entries.length, 1)
+    assert.equal(entries[0].key, 'bin:test-pkg')
+    assert.equal(entries[0].name, 'bin:test-pkg')
+    assert.equal(entries[0].source, 'bin')
+    assert.ok(entries[0].filePath.endsWith('dist/cli.js'))
+    assert.equal(entries[0].importSpecifier, entries[0].filePath)
+  })
+
+  it('discovers object bin form with multiple entries', () => {
+    mkdirSync(join(tempDir, 'dist'), {recursive: true})
+    writeFileSync(join(tempDir, 'dist', 'cli-a.js'), 'console.log("a")')
+    writeFileSync(join(tempDir, 'dist', 'cli-b.js'), 'console.log("b")')
+    writeFileSync(
+      join(tempDir, 'package.json'),
+      JSON.stringify({
+        name: 'test-pkg',
+        version: '1.0.0',
+        bin: {
+          'cmd-a': './dist/cli-a.js',
+          'cmd-b': './dist/cli-b.js',
+        },
+      }),
+    )
+
+    const entries = discoverBins(tempDir, [], [])
+    assert.equal(entries.length, 2)
+    assert.equal(entries[0].key, 'bin:cmd-a')
+    assert.equal(entries[0].name, 'bin:cmd-a')
+    assert.equal(entries[0].source, 'bin')
+    assert.ok(entries[0].filePath.endsWith('dist/cli-a.js'))
+    assert.equal(entries[1].key, 'bin:cmd-b')
+    assert.equal(entries[1].name, 'bin:cmd-b')
+  })
+
+  it('returns empty array when no bin field', () => {
+    writeFileSync(
+      join(tempDir, 'package.json'),
+      JSON.stringify({
+        name: 'test-pkg',
+        version: '1.0.0',
+      }),
+    )
+
+    const entries = discoverBins(tempDir, [], [])
+    assert.equal(entries.length, 0)
+  })
+
+  it('respects ignore patterns', () => {
+    mkdirSync(join(tempDir, 'dist'), {recursive: true})
+    writeFileSync(join(tempDir, 'dist', 'cli-a.js'), 'console.log("a")')
+    writeFileSync(join(tempDir, 'dist', 'cli-b.js'), 'console.log("b")')
+    writeFileSync(
+      join(tempDir, 'package.json'),
+      JSON.stringify({
+        name: 'test-pkg',
+        version: '1.0.0',
+        bin: {
+          'cmd-a': './dist/cli-a.js',
+          'cmd-b': './dist/cli-b.js',
+        },
+      }),
+    )
+
+    const entries = discoverBins(tempDir, ['bin:cmd-a'], [])
+    assert.equal(entries.length, 1)
+    assert.equal(entries[0].key, 'bin:cmd-b')
+  })
+
+  it('respects only patterns', () => {
+    mkdirSync(join(tempDir, 'dist'), {recursive: true})
+    writeFileSync(join(tempDir, 'dist', 'cli-a.js'), 'console.log("a")')
+    writeFileSync(join(tempDir, 'dist', 'cli-b.js'), 'console.log("b")')
+    writeFileSync(
+      join(tempDir, 'package.json'),
+      JSON.stringify({
+        name: 'test-pkg',
+        version: '1.0.0',
+        bin: {
+          'cmd-a': './dist/cli-a.js',
+          'cmd-b': './dist/cli-b.js',
+        },
+      }),
+    )
+
+    const entries = discoverBins(tempDir, [], ['bin:cmd-a'])
+    assert.equal(entries.length, 1)
+    assert.equal(entries[0].key, 'bin:cmd-a')
+  })
+
+  it('skips bin entries whose files do not exist', () => {
+    writeFileSync(
+      join(tempDir, 'package.json'),
+      JSON.stringify({
+        name: 'test-pkg',
+        version: '1.0.0',
+        bin: './dist/missing.js',
+      }),
+    )
+
+    const entries = discoverBins(tempDir, [], [])
+    assert.equal(entries.length, 0)
+  })
+
+  it('ignores all bins with bin:* glob pattern', () => {
+    mkdirSync(join(tempDir, 'dist'), {recursive: true})
+    writeFileSync(join(tempDir, 'dist', 'cli.js'), 'console.log("hi")')
+    writeFileSync(
+      join(tempDir, 'package.json'),
+      JSON.stringify({
+        name: 'test-pkg',
+        version: '1.0.0',
+        bin: './dist/cli.js',
+      }),
+    )
+
+    const entries = discoverBins(tempDir, ['bin:*'], [])
+    assert.equal(entries.length, 0)
   })
 })

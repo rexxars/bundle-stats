@@ -186,6 +186,9 @@ fi
 if [[ "${INPUT_NO_BUNDLE:-false}" == "true" ]]; then
   CLI_FLAGS+=(--no-bundle)
 fi
+if [[ "${INPUT_NO_BIN_BENCHMARK:-false}" == "true" ]]; then
+  CLI_FLAGS+=(--no-bin-benchmark)
+fi
 
 # Handle comma-separated ignore patterns
 if [[ -n "${INPUT_IGNORE:-}" ]]; then

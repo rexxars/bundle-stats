@@ -12,7 +12,7 @@ export type {
 } from './types.ts'
 
 export {globToRegex, matchesAny} from './glob.ts'
-export {discoverExports, readPackageJson, getPeerDependencies} from './exports.ts'
+export {discoverExports, discoverBins, readPackageJson, getPeerDependencies} from './exports.ts'
 export {measureInternalSize} from './measure/sizes.ts'
 export {measureBundledSize} from './measure/bundle.ts'
 export {measureImportTime} from './measure/imports.ts'
@@ -24,7 +24,7 @@ export {parseValue, evaluateThresholds, formatViolationsMarkdown} from './thresh
 export type {ThresholdConfig, ThresholdViolation} from './thresholds.ts'
 export {resolveNpmVersion, measureNpmPackage} from './npm.ts'
 
-import {discoverExports, getPeerDependencies, readPackageJson} from './exports.ts'
+import {discoverExports, discoverBins, getPeerDependencies, readPackageJson} from './exports.ts'
 import {measureBundledSize} from './measure/bundle.ts'
 import {measureImportTime} from './measure/imports.ts'
 import {measureInternalSize} from './measure/sizes.ts'
@@ -43,13 +43,32 @@ export async function generateReport(
   options: ReportOptions,
   onProgress?: ProgressCallback,
 ): Promise<Report> {
-  const {packagePath, ignorePatterns, onlyPatterns, conditions, noBenchmark, noBundle, outdir} =
-    options
+  const {
+    packagePath,
+    ignorePatterns,
+    onlyPatterns,
+    conditions,
+    noBenchmark,
+    noBundle,
+    noBinBenchmark,
+    outdir,
+  } = options
   const progress = onProgress ?? (() => {})
 
-  // 1. Discover exports
-  const entries = discoverExports(packagePath, ignorePatterns, onlyPatterns, conditions)
-  progress(`Found ${entries.length} exports`)
+  // 1. Discover exports and bin entries
+  const exportEntries = discoverExports(packagePath, ignorePatterns, onlyPatterns, conditions)
+  const binEntries = discoverBins(packagePath, ignorePatterns, onlyPatterns)
+  const entries = [...exportEntries, ...binEntries]
+
+  if (entries.length === 0) {
+    const pkg = readPackageJson(packagePath)
+    throw new Error(
+      `No "exports" or "bin" entries found in ${pkg.name}. ` +
+        'At least one must be present in package.json.',
+    )
+  }
+
+  progress(`Found ${exportEntries.length} exports and ${binEntries.length} bin entries`)
 
   // 2. Read package metadata
   const pkg = readPackageJson(packagePath)
@@ -108,8 +127,14 @@ export async function generateReport(
         // Import benchmarks only meaningful under Node's native resolution
         continue
       }
+      if (entry.source === 'bin' && noBinBenchmark) {
+        continue
+      }
       progress(`Benchmarking import ${entry.name} (${i + 1}/${entries.length})...`)
-      const importResult = await measureImportTime(entry.importSpecifier, {cwd: packagePath})
+      const importResult = await measureImportTime(entry.importSpecifier, {
+        cwd: packagePath,
+        unrestrictedReads: entry.source === 'bin',
+      })
       exportReports[i].importTime = importResult
     }
   }
