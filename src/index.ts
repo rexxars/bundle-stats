@@ -131,7 +131,10 @@ export async function generateReport(
         continue
       }
       progress(`Benchmarking import ${entry.name} (${i + 1}/${entries.length})...`)
-      const importResult = await measureImportTime(entry.importSpecifier, {cwd: packagePath})
+      const importResult = await measureImportTime(entry.importSpecifier, {
+        cwd: packagePath,
+        unrestrictedReads: entry.source === 'bin',
+      })
       exportReports[i].importTime = importResult
     }
   }

@@ -60,6 +60,14 @@ interface BenchmarkOptions {
   trimCount: number
   /** Working directory for the child process (should be the package dir) */
   cwd: string
+  /**
+   * When true, allow unrestricted filesystem reads in the child process.
+   * Used for bin entry benchmarks where the import specifier is an absolute
+   * file path — Node's ESM resolver checks for workspace configs, package.json
+   * files, and node_modules in ancestor directories that are hard to enumerate.
+   * The sandbox still restricts writes to tmpdir.
+   */
+  unrestrictedReads: boolean
 }
 
 const DEFAULT_OPTIONS: BenchmarkOptions = {
@@ -67,6 +75,7 @@ const DEFAULT_OPTIONS: BenchmarkOptions = {
   delayMs: 200,
   trimCount: 2,
   cwd: process.cwd(),
+  unrestrictedReads: false,
 }
 
 export async function measureImportTime(
@@ -81,7 +90,7 @@ export async function measureImportTime(
     if (i > 0) {
       await sleep(opts.delayMs)
     }
-    const result = runSingleImport(specifier, opts.cwd)
+    const result = runSingleImport(specifier, opts.cwd, opts.unrestrictedReads)
     if (typeof result === 'number') {
       times.push(result)
     } else {
@@ -105,7 +114,11 @@ export async function measureImportTime(
   return {medianMs, runs: trimmed, failed: false, error: null}
 }
 
-function runSingleImport(specifier: string, cwd: string): number | {error: string} {
+function runSingleImport(
+  specifier: string,
+  cwd: string,
+  unrestrictedReads: boolean,
+): number | {error: string} {
   const script = `
     const s = performance.now();
     await import(${JSON.stringify(specifier)});
@@ -119,15 +132,24 @@ function runSingleImport(specifier: string, cwd: string): number | {error: strin
   // Node v24 requires separate --allow-fs-read flags (comma-separated is deprecated).
   // Trailing slash grants recursive read access to directories.
   const absCwd = path.resolve(cwd)
-  const readablePaths = findReadablePaths(absCwd)
+
+  // For bin entries (unrestrictedReads), allow reading the entire filesystem.
+  // Bin specifiers are absolute file paths, and Node's ESM resolver checks
+  // workspace configs, package.json, and node_modules across all ancestor
+  // directories — too many paths to enumerate individually.
+  const readFlags = unrestrictedReads
+    ? ['--allow-fs-read=*']
+    : [
+        ...findReadablePaths(absCwd).map((p) => `--allow-fs-read=${p}`),
+        `--allow-fs-read=${tmpdir()}${path.sep}`,
+      ]
 
   try {
     const result = execFileSync(
       'node',
       [
         '--permission',
-        ...readablePaths.map((p) => `--allow-fs-read=${p}`),
-        `--allow-fs-read=${tmpdir()}${path.sep}`,
+        ...readFlags,
         `--allow-fs-write=${tmpdir()}${path.sep}`,
         '--allow-addons',
         '--input-type=module',
