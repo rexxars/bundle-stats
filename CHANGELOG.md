@@ -5,6 +5,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.9.6](https://github.com/rexxars/bundle-stats/compare/v1.9.5...v1.9.6) (2026-03-26)
+
+### Bug Fixes
+
+- scope PR comment marker to prevent collisions with other bots ([#13](https://github.com/rexxars/bundle-stats/issues/13)) ([f796b69](https://github.com/rexxars/bundle-stats/commit/f796b6943a4ba2afb757e65d19f917236c696190))
+
 ## [1.9.5](https://github.com/rexxars/bundle-stats/compare/v1.9.4...v1.9.5) (2026-03-25)
 
 ### Bug Fixes
