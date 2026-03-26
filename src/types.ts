@@ -9,6 +9,8 @@ export interface ExportEntry {
   importSpecifier: string
   /** Export condition this entry was resolved under, e.g. "node", "default" */
   condition?: string
+  /** Set to 'bin' for entries discovered from the "bin" field in package.json */
+  source?: 'bin'
 }
 
 export interface SizeResult {
@@ -81,5 +83,6 @@ export interface ReportOptions {
   conditions: string[]
   noBenchmark: boolean
   noBundle: boolean
+  noBinBenchmark: boolean
   outdir: string
 }

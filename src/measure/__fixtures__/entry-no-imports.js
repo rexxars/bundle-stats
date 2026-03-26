@@ -1,1 +1,1 @@
-export const standalone = "hello";
+export const standalone = 'hello'

@@ -18,24 +18,13 @@ describe('parseRelativeImports', () => {
   })
 
   it('finds multi-line named imports', () => {
-    const code = [
-      'import {',
-      '  foo,',
-      '  bar,',
-      '  baz',
-      '} from "./chunk.js";',
-    ].join('\n')
+    const code = ['import {', '  foo,', '  bar,', '  baz', '} from "./chunk.js";'].join('\n')
     const result = parseRelativeImports(code)
     assert.deepEqual(result, ['./chunk.js'])
   })
 
   it('finds multi-line re-exports', () => {
-    const code = [
-      'export {',
-      '  foo,',
-      '  bar',
-      '} from "./chunk.js";',
-    ].join('\n')
+    const code = ['export {', '  foo,', '  bar', '} from "./chunk.js";'].join('\n')
     const result = parseRelativeImports(code)
     assert.deepEqual(result, ['./chunk.js'])
   })
@@ -46,10 +35,9 @@ describe('parseRelativeImports', () => {
   })
 
   it('finds multiple imports in the same file', () => {
-    const code = [
-      'import { a } from "./chunk-a.js";',
-      'import { b } from "./chunk-b.js";',
-    ].join('\n')
+    const code = ['import { a } from "./chunk-a.js";', 'import { b } from "./chunk-b.js";'].join(
+      '\n',
+    )
     const result = parseRelativeImports(code)
     assert.deepEqual(result, ['./chunk-a.js', './chunk-b.js'])
   })
@@ -83,7 +71,7 @@ describe('parseRelativeImports', () => {
 describe('measureInternalSize', () => {
   it('measures a standalone file with no imports', () => {
     const result = measureInternalSize(fixture('entry-no-imports.js'))
-    assert.equal(result.rawBytes, 35)
+    assert.equal(result.rawBytes, 34)
     assert.ok(result.gzipBytes > 0)
   })
 
@@ -99,7 +87,7 @@ describe('measureInternalSize', () => {
     // Both reference the same chunk, multi-line entry is larger but chunk is same
     assert.ok(withImport.rawBytes > singleLine.rawBytes, 'multi-line entry is larger')
     // Both should include chunk-a.js content
-    const chunkSize = 78 // "export const foo...\nexport const bar...\nexport const baz...\n"
+    const chunkSize = 75 // "export const foo...\nexport const bar...\nexport const baz...\n"
     assert.ok(withImport.rawBytes > chunkSize, 'should include chunk content')
     assert.ok(singleLine.rawBytes > chunkSize, 'should include chunk content')
   })
@@ -114,8 +102,8 @@ describe('measureInternalSize', () => {
     // entry-single-line and entry-multi-line both import chunk-a.js
     // If we measured each, the chunk should only be counted once per entry
     const result = measureInternalSize(fixture('entry-single-line.js'))
-    const entrySize = 52 // entry-single-line.js
-    const chunkSize = 78 // chunk-a.js
+    const entrySize = 46 // entry-single-line.js
+    const chunkSize = 75 // chunk-a.js
     assert.equal(result.rawBytes, entrySize + chunkSize)
   })
 })

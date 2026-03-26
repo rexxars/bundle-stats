@@ -36,7 +36,13 @@ interface MeasureNpmPackageOptions {
   version: string
   reportOptions: Pick<
     ReportOptions,
-    'ignorePatterns' | 'onlyPatterns' | 'conditions' | 'noBenchmark' | 'noBundle' | 'outdir'
+    | 'ignorePatterns'
+    | 'onlyPatterns'
+    | 'conditions'
+    | 'noBenchmark'
+    | 'noBundle'
+    | 'noBinBenchmark'
+    | 'outdir'
   >
   onProgress?: ProgressCallback
 }
@@ -78,6 +84,7 @@ export async function measureNpmPackage(options: MeasureNpmPackageOptions): Prom
         conditions: reportOptions.conditions,
         noBenchmark: reportOptions.noBenchmark,
         noBundle: reportOptions.noBundle,
+        noBinBenchmark: reportOptions.noBinBenchmark,
         outdir: reportOptions.outdir,
       },
       onProgress,

@@ -1,2 +1,2 @@
-import "./chunk-a.js";
-export const x = 1;
+import './chunk-a.js'
+export const x = 1

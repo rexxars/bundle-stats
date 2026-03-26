@@ -21,6 +21,7 @@ export async function main(): Promise<void> {
       conditions: {type: 'string', multiple: true, default: []},
       'no-benchmark': {type: 'boolean', default: false},
       'no-bundle': {type: 'boolean', default: false},
+      'no-bin-benchmark': {type: 'boolean', default: false},
       'ref-label': {type: 'string'},
       outdir: {type: 'string', default: '.bundle-stats'},
       help: {type: 'boolean', short: 'h', default: false},
@@ -42,6 +43,7 @@ Options:
   --conditions <name>  Export conditions to measure separately (repeatable, e.g. --conditions node --conditions default)
   --no-benchmark       Skip import time benchmarks
   --no-bundle          Skip Rollup bundling + treemap generation
+  --no-bin-benchmark   Skip import time benchmarks for bin entries
   --ref-label <label>  Label stored in the report to identify the measured ref (e.g. "main (abc12345)")
   --outdir <path>      Directory for treemap HTML artifacts (default: .bundle-stats/)
   -h, --help           Show this help message`)
@@ -76,6 +78,7 @@ Options:
       conditions: values.conditions ?? [],
       noBenchmark: values['no-benchmark']!,
       noBundle: values['no-bundle']!,
+      noBinBenchmark: values['no-bin-benchmark']!,
       outdir: values.outdir!,
     },
     progress,
@@ -108,6 +111,7 @@ Options:
         conditions: values.conditions ?? [],
         noBenchmark: values['no-benchmark']!,
         noBundle: values['no-bundle']!,
+        noBinBenchmark: values['no-bin-benchmark']!,
         outdir: values.outdir!,
       },
       onProgress: progress,

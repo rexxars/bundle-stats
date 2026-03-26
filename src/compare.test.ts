@@ -47,14 +47,34 @@ describe('compareReports', () => {
   it('matches conditioned exports by key and condition', () => {
     const baseline = makeReport({
       exports: [
-        makeExport({key: '.', condition: 'node', name: 'my-pkg [node]', internalSize: {rawBytes: 1000, gzipBytes: 500}}),
-        makeExport({key: '.', condition: 'default', name: 'my-pkg [default]', internalSize: {rawBytes: 2000, gzipBytes: 900}}),
+        makeExport({
+          key: '.',
+          condition: 'node',
+          name: 'my-pkg [node]',
+          internalSize: {rawBytes: 1000, gzipBytes: 500},
+        }),
+        makeExport({
+          key: '.',
+          condition: 'default',
+          name: 'my-pkg [default]',
+          internalSize: {rawBytes: 2000, gzipBytes: 900},
+        }),
       ],
     })
     const current = makeReport({
       exports: [
-        makeExport({key: '.', condition: 'node', name: 'my-pkg [node]', internalSize: {rawBytes: 1100, gzipBytes: 550}}),
-        makeExport({key: '.', condition: 'default', name: 'my-pkg [default]', internalSize: {rawBytes: 2000, gzipBytes: 900}}),
+        makeExport({
+          key: '.',
+          condition: 'node',
+          name: 'my-pkg [node]',
+          internalSize: {rawBytes: 1100, gzipBytes: 550},
+        }),
+        makeExport({
+          key: '.',
+          condition: 'default',
+          name: 'my-pkg [default]',
+          internalSize: {rawBytes: 2000, gzipBytes: 900},
+        }),
       ],
     })
 
@@ -78,9 +98,7 @@ describe('compareReports', () => {
 
   it('detects added conditioned export', () => {
     const baseline = makeReport({
-      exports: [
-        makeExport({key: '.', condition: 'node', name: 'my-pkg [node]'}),
-      ],
+      exports: [makeExport({key: '.', condition: 'node', name: 'my-pkg [node]'})],
     })
     const current = makeReport({
       exports: [
@@ -106,9 +124,7 @@ describe('compareReports', () => {
       ],
     })
     const current = makeReport({
-      exports: [
-        makeExport({key: '.', condition: 'node', name: 'my-pkg [node]'}),
-      ],
+      exports: [makeExport({key: '.', condition: 'node', name: 'my-pkg [node]'})],
     })
 
     const {deltas} = compareReports(current, baseline)
@@ -123,12 +139,22 @@ describe('compareReports', () => {
   it('does not cross-match exports with same key but different conditions', () => {
     const baseline = makeReport({
       exports: [
-        makeExport({key: '.', condition: 'node', name: 'my-pkg [node]', internalSize: {rawBytes: 1000, gzipBytes: 500}}),
+        makeExport({
+          key: '.',
+          condition: 'node',
+          name: 'my-pkg [node]',
+          internalSize: {rawBytes: 1000, gzipBytes: 500},
+        }),
       ],
     })
     const current = makeReport({
       exports: [
-        makeExport({key: '.', condition: 'default', name: 'my-pkg [default]', internalSize: {rawBytes: 2000, gzipBytes: 900}}),
+        makeExport({
+          key: '.',
+          condition: 'default',
+          name: 'my-pkg [default]',
+          internalSize: {rawBytes: 2000, gzipBytes: 900},
+        }),
       ],
     })
 
