@@ -391,4 +391,44 @@ describe('discoverBins', () => {
     const entries = discoverBins(tempDir, ['bin:*'], [])
     assert.equal(entries.length, 0)
   })
+
+  it('includes all bin entries when only patterns do not target bins', () => {
+    mkdirSync(join(tempDir, 'dist'), {recursive: true})
+    writeFileSync(join(tempDir, 'dist', 'cli.js'), 'console.log("hi")')
+    writeFileSync(
+      join(tempDir, 'package.json'),
+      JSON.stringify({
+        name: 'test-pkg',
+        version: '1.0.0',
+        bin: './dist/cli.js',
+      }),
+    )
+
+    // --only '.' should NOT filter out bin entries since '.' targets exports, not bins
+    const entries = discoverBins(tempDir, [], ['.'])
+    assert.equal(entries.length, 1)
+    assert.equal(entries[0].key, 'bin:test-pkg')
+  })
+
+  it('filters bin entries when only patterns explicitly target bins', () => {
+    mkdirSync(join(tempDir, 'dist'), {recursive: true})
+    writeFileSync(join(tempDir, 'dist', 'cli-a.js'), 'console.log("a")')
+    writeFileSync(join(tempDir, 'dist', 'cli-b.js'), 'console.log("b")')
+    writeFileSync(
+      join(tempDir, 'package.json'),
+      JSON.stringify({
+        name: 'test-pkg',
+        version: '1.0.0',
+        bin: {
+          'cmd-a': './dist/cli-a.js',
+          'cmd-b': './dist/cli-b.js',
+        },
+      }),
+    )
+
+    // --only 'bin:cmd-a' should still filter to only that bin
+    const entries = discoverBins(tempDir, [], ['bin:cmd-a'])
+    assert.equal(entries.length, 1)
+    assert.equal(entries[0].key, 'bin:cmd-a')
+  })
 })

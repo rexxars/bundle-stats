@@ -168,12 +168,13 @@ export function discoverBins(
     typeof pkg.bin === 'string' ? {[pkg.name]: pkg.bin} : pkg.bin
 
   const entries: ExportEntry[] = []
+  const binOnlyPatterns = onlyPatterns.filter((p) => p.startsWith('bin:'))
 
   for (const [binName, relativePath] of Object.entries(binMap)) {
     const key = `bin:${binName}`
 
     // Apply ignore/only filtering using the key
-    if (onlyPatterns.length > 0 && !matchesAny(key, onlyPatterns)) continue
+    if (binOnlyPatterns.length > 0 && !matchesAny(key, binOnlyPatterns)) continue
     if (matchesAny(key, ignorePatterns)) continue
 
     const filePath = resolve(packagePath, relativePath)
