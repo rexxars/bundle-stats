@@ -5,6 +5,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.10.0](https://github.com/rexxars/bundle-stats/compare/v1.9.6...v1.10.0) (2026-03-26)
+
+### Features
+
+- add support for measuring bin entries in package.json ([#14](https://github.com/rexxars/bundle-stats/issues/14)) ([a623116](https://github.com/rexxars/bundle-stats/commit/a623116b68f551ed51d43c2f75620df860252559))
+
 ## [1.9.6](https://github.com/rexxars/bundle-stats/compare/v1.9.5...v1.9.6) (2026-03-26)
 
 ### Bug Fixes
