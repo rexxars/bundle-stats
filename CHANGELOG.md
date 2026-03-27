@@ -5,6 +5,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.11.0](https://github.com/rexxars/bundle-stats/compare/v1.10.1...v1.11.0) (2026-03-27)
+
+### Features
+
+- add --allow-bin-child-process flag for CLI import benchmarks ([#16](https://github.com/rexxars/bundle-stats/issues/16)) ([c7e46ef](https://github.com/rexxars/bundle-stats/commit/c7e46ef38d9d2221eb377b962d6c99ff2dc9ccb0))
+
 ## [1.10.1](https://github.com/rexxars/bundle-stats/compare/v1.10.0...v1.10.1) (2026-03-26)
 
 ### Bug Fixes
