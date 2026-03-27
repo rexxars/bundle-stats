@@ -84,5 +84,6 @@ export interface ReportOptions {
   noBenchmark: boolean
   noBundle: boolean
   noBinBenchmark: boolean
+  allowBinChildProcess: boolean
   outdir: string
 }

@@ -189,6 +189,9 @@ fi
 if [[ "${INPUT_NO_BIN_BENCHMARK:-false}" == "true" ]]; then
   CLI_FLAGS+=(--no-bin-benchmark)
 fi
+if [[ "${INPUT_ALLOW_BIN_CHILD_PROCESS:-false}" == "true" ]]; then
+  CLI_FLAGS+=(--allow-bin-child-process)
+fi
 
 # Handle comma-separated ignore patterns
 if [[ -n "${INPUT_IGNORE:-}" ]]; then

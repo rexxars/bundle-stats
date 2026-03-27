@@ -51,6 +51,7 @@ export async function generateReport(
     noBenchmark,
     noBundle,
     noBinBenchmark,
+    allowBinChildProcess,
     outdir,
   } = options
   const progress = onProgress ?? (() => {})
@@ -134,6 +135,7 @@ export async function generateReport(
       const importResult = await measureImportTime(entry.importSpecifier, {
         cwd: packagePath,
         unrestrictedReads: entry.source === 'bin',
+        allowChildProcess: entry.source === 'bin' && allowBinChildProcess,
       })
       exportReports[i].importTime = importResult
     }
