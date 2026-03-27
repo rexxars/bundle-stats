@@ -42,6 +42,7 @@ interface MeasureNpmPackageOptions {
     | 'noBenchmark'
     | 'noBundle'
     | 'noBinBenchmark'
+    | 'allowBinChildProcess'
     | 'outdir'
   >
   onProgress?: ProgressCallback
@@ -85,6 +86,7 @@ export async function measureNpmPackage(options: MeasureNpmPackageOptions): Prom
         noBenchmark: reportOptions.noBenchmark,
         noBundle: reportOptions.noBundle,
         noBinBenchmark: reportOptions.noBinBenchmark,
+        allowBinChildProcess: reportOptions.allowBinChildProcess,
         outdir: reportOptions.outdir,
       },
       onProgress,

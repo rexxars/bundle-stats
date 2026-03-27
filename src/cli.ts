@@ -22,6 +22,7 @@ export async function main(): Promise<void> {
       'no-benchmark': {type: 'boolean', default: false},
       'no-bundle': {type: 'boolean', default: false},
       'no-bin-benchmark': {type: 'boolean', default: false},
+      'allow-bin-child-process': {type: 'boolean', default: false},
       'ref-label': {type: 'string'},
       outdir: {type: 'string', default: '.bundle-stats'},
       help: {type: 'boolean', short: 'h', default: false},
@@ -44,6 +45,7 @@ Options:
   --no-benchmark       Skip import time benchmarks
   --no-bundle          Skip Rollup bundling + treemap generation
   --no-bin-benchmark   Skip import time benchmarks for bin entries
+  --allow-bin-child-process  Allow bin entries to spawn child processes during import benchmarks
   --ref-label <label>  Label stored in the report to identify the measured ref (e.g. "main (abc12345)")
   --outdir <path>      Directory for treemap HTML artifacts (default: .bundle-stats/)
   -h, --help           Show this help message`)
@@ -79,6 +81,7 @@ Options:
       noBenchmark: values['no-benchmark']!,
       noBundle: values['no-bundle']!,
       noBinBenchmark: values['no-bin-benchmark']!,
+      allowBinChildProcess: values['allow-bin-child-process']!,
       outdir: values.outdir!,
     },
     progress,
@@ -112,6 +115,7 @@ Options:
         noBenchmark: values['no-benchmark']!,
         noBundle: values['no-bundle']!,
         noBinBenchmark: values['no-bin-benchmark']!,
+        allowBinChildProcess: values['allow-bin-child-process']!,
         outdir: values.outdir!,
       },
       onProgress: progress,

@@ -68,6 +68,13 @@ interface BenchmarkOptions {
    * The sandbox still restricts writes to tmpdir.
    */
   unrestrictedReads: boolean
+  /**
+   * When true, allow the sandboxed child process to spawn child processes.
+   * Only used for bin entries when explicitly opted in via --allow-bin-child-process.
+   * This weakens the sandbox — spawned children do NOT inherit --permission
+   * restrictions — so it should only be used in trusted contexts.
+   */
+  allowChildProcess: boolean
 }
 
 const DEFAULT_OPTIONS: BenchmarkOptions = {
@@ -76,6 +83,7 @@ const DEFAULT_OPTIONS: BenchmarkOptions = {
   trimCount: 2,
   cwd: process.cwd(),
   unrestrictedReads: false,
+  allowChildProcess: false,
 }
 
 export async function measureImportTime(
@@ -90,11 +98,15 @@ export async function measureImportTime(
     if (i > 0) {
       await sleep(opts.delayMs)
     }
-    const result = runSingleImport(specifier, opts.cwd, opts.unrestrictedReads)
+    const result = runSingleImport(specifier, opts.cwd, opts.unrestrictedReads, opts.allowChildProcess)
     if (typeof result === 'number') {
       times.push(result)
     } else {
       lastError = result.error
+      // Bail early on permission denials — retrying won't help
+      if (lastError.includes('ERR_ACCESS_DENIED')) {
+        return {medianMs: 0, runs: [], failed: true, error: lastError}
+      }
     }
   }
 
@@ -118,6 +130,7 @@ function runSingleImport(
   specifier: string,
   cwd: string,
   unrestrictedReads: boolean,
+  allowChildProcess: boolean,
 ): number | {error: string} {
   const script = `
     const s = performance.now();
@@ -152,6 +165,7 @@ function runSingleImport(
         ...readFlags,
         `--allow-fs-write=${tmpdir()}${path.sep}`,
         '--allow-addons',
+        ...(allowChildProcess ? ['--allow-child-process'] : []),
         '--input-type=module',
         '-e',
         script,
