@@ -20,16 +20,21 @@ bundle-stats [options]
 
 ### Options
 
-| Flag                  | Description                                                       | Default          |
-| --------------------- | ----------------------------------------------------------------- | ---------------- |
-| `--package <path>`    | Path to target package directory or its `package.json`            | `.`              |
-| `--format <fmt>`      | Output format: `cli`, `markdown`, or `json`                       | `cli`            |
-| `--compare <path\|->` | Baseline JSON report for delta comparison (`-` reads stdin)       |                  |
-| `--compare-npm <ver>` | Compare against a published npm version (e.g. `latest`, `5.12.0`) |                  |
-| `--ignore <pattern>`  | Glob pattern to skip exports (repeatable)                         |                  |
-| `--no-benchmark`      | Skip import time benchmarks                                       |                  |
-| `--no-bundle`         | Skip Rollup bundling and treemap generation                       |                  |
-| `--outdir <path>`     | Directory for treemap HTML artifacts                              | `.bundle-stats/` |
+| Flag                          | Description                                                                | Default          |
+| ----------------------------- | -------------------------------------------------------------------------- | ---------------- |
+| `--package <path>`            | Path to target package directory or its `package.json`                     | `.`              |
+| `--format <fmt>`              | Output format: `cli`, `markdown`, or `json`                                | `cli`            |
+| `--compare <path\|->` | Baseline JSON report for delta comparison (`-` reads stdin)                         |                  |
+| `--compare-npm <ver>`         | Compare against a published npm version (e.g. `latest`, `5.12.0`)         |                  |
+| `--ignore <pattern>`          | Glob pattern to skip exports (repeatable)                                  |                  |
+| `--only <pattern>`            | Only include matching exports (repeatable)                                 |                  |
+| `--conditions <name>`         | Export conditions to measure separately (repeatable)                       |                  |
+| `--no-benchmark`              | Skip import time benchmarks                                                |                  |
+| `--no-bundle`                 | Skip Rollup bundling and treemap generation                                |                  |
+| `--no-bin-benchmark`          | Skip import time benchmarks for bin entries                                |                  |
+| `--allow-bin-child-process`   | Allow bin entries to spawn child processes during import benchmarks         |                  |
+| `--ref-label <label>`         | Label stored in the report to identify the measured ref                    |                  |
+| `--outdir <path>`             | Directory for treemap HTML artifacts                                       | `.bundle-stats/` |
 
 ### Examples
 
@@ -83,7 +88,7 @@ bundle-stats --ignore cli --ignore _internal
 
 ## What It Measures
 
-The tool reads the `exports` field in your `package.json` and runs three measurement passes:
+The tool reads the `exports` and `bin` fields in your `package.json` and runs three measurement passes:
 
 | Metric            | Description                                                                                         |
 | ----------------- | --------------------------------------------------------------------------------------------------- |
@@ -127,22 +132,27 @@ The action automatically checks out the PR base, builds, measures, then does the
 
 ### Action Inputs
 
-| Input                    | Default     | Description                                                       |
-| ------------------------ | ----------- | ----------------------------------------------------------------- |
-| `packages`               | `.`         | Comma-separated package names (resolved via workspaces) or paths  |
-| `build-script`           | `build`     | npm script to run per-package via PM filter syntax                |
-| `build-command`          |             | Global build command (overrides per-package builds, for turbo/nx) |
-| `base-ref`               | PR base SHA | Git ref for baseline measurement                                  |
-| `head-ref`               | Current SHA | Git ref for current measurement                                   |
-| `max-import-time`        |             | Max import time per export (e.g. `500ms`)                         |
-| `max-bundle-size-gzip`   |             | Max gzip bundle size per export (e.g. `100kb`)                    |
-| `max-bundle-size-raw`    |             | Max raw bundle size per export (e.g. `500kb`)                     |
-| `max-internal-size-gzip` |             | Max gzip internal size per export (e.g. `50kb`)                   |
-| `max-internal-size-raw`  |             | Max raw internal size per export (e.g. `200kb`)                   |
-| `ignore`                 |             | Comma-separated glob patterns to skip exports                     |
-| `only`                   |             | Comma-separated glob patterns for exports to include              |
-| `no-benchmark`           | `false`     | Skip import time benchmarks                                       |
-| `no-bundle`              | `false`     | Skip Rollup bundling                                              |
+| Input                     | Default     | Description                                                                   |
+| ------------------------- | ----------- | ----------------------------------------------------------------------------- |
+| `packages`                | `.`         | Comma-separated package names (resolved via workspaces) or paths              |
+| `build-script`            | `build`     | npm script to run per-package via PM filter syntax                            |
+| `build-command`           |             | Global build command (overrides per-package builds, for turbo/nx)             |
+| `base-ref`                | PR base SHA | Git ref for baseline measurement                                              |
+| `head-ref`                | Current SHA | Git ref for current measurement                                               |
+| `max-import-time`         |             | Max import time per export (e.g. `500ms`)                                     |
+| `max-bundle-size-gzip`    |             | Max gzip bundle size per export (e.g. `100kb`)                                |
+| `max-bundle-size-raw`     |             | Max raw bundle size per export (e.g. `500kb`)                                 |
+| `max-internal-size-gzip`  |             | Max gzip internal size per export (e.g. `50kb`)                               |
+| `max-internal-size-raw`   |             | Max raw internal size per export (e.g. `200kb`)                               |
+| `ignore`                  |             | Comma-separated glob patterns to skip exports                                 |
+| `only`                    |             | Comma-separated glob patterns for exports to include                          |
+| `no-benchmark`            | `false`     | Skip import time benchmarks                                                   |
+| `no-bundle`               | `false`     | Skip Rollup bundling                                                          |
+| `no-bin-benchmark`        | `false`     | Skip import time benchmarks for bin entries                                   |
+| `allow-bin-child-process` | `false`     | Allow bin entries to spawn child processes during import benchmarks            |
+| `conditions`              |             | Space-separated export conditions to measure separately                       |
+| `compare-npm`             |             | Compare against a published npm version (e.g. `latest`, `5.12.0`)            |
+| `comment-id`              |             | Unique identifier for the PR comment (prevents collisions with other actions) |
 
 ## Manual CI Usage
 
