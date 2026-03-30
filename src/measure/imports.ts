@@ -1,5 +1,5 @@
 import {execFileSync} from 'node:child_process'
-import {existsSync, readFileSync} from 'node:fs'
+import {existsSync, mkdtempSync, readFileSync, rmSync} from 'node:fs'
 import {tmpdir} from 'node:os'
 import path from 'node:path'
 
@@ -132,10 +132,15 @@ function runSingleImport(
   unrestrictedReads: boolean,
   allowChildProcess: boolean,
 ): number | {error: string} {
+  // Write timing to a temp file instead of stdout so that bin entries
+  // that produce stdout output on import don't corrupt the measurement.
+  const timingFile = path.join(mkdtempSync(path.join(tmpdir(), 'bs-')), 'timing')
+
   const script = `
+    import { writeFileSync } from 'node:fs';
     const s = performance.now();
     await import(${JSON.stringify(specifier)});
-    process.stdout.write(String(performance.now() - s));
+    writeFileSync(${JSON.stringify(timingFile)}, String(performance.now() - s));
   `
   // Resolve readable paths for --allow-fs-read scoping.
   // The child process needs to read:
@@ -158,7 +163,7 @@ function runSingleImport(
       ]
 
   try {
-    const result = execFileSync(
+    execFileSync(
       'node',
       [
         '--permission',
@@ -178,7 +183,7 @@ function runSingleImport(
         timeout: 30_000,
       },
     )
-    return parseFloat(result.trim())
+    return parseFloat(readFileSync(timingFile, 'utf-8').trim())
   } catch (err) {
     // stderr is captured via stdio: 'pipe' so it won't leak to the terminal.
     // Extract a short, meaningful error message from the child process stderr.
@@ -186,6 +191,10 @@ function runSingleImport(
       err && typeof err === 'object' && 'stderr' in err ? String(err.stderr).trim() : ''
     const message = summarizeError(stderr) || (err instanceof Error ? err.message : String(err))
     return {error: message}
+  } finally {
+    try {
+      rmSync(path.dirname(timingFile), {recursive: true})
+    } catch {}
   }
 }
 
