@@ -5,6 +5,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.11.2](https://github.com/rexxars/bundle-stats/compare/v1.11.1...v1.11.2) (2026-04-01)
+
+### Bug Fixes
+
+- skip import statements inside strings, templates, and comments ([#19](https://github.com/rexxars/bundle-stats/issues/19)) ([7b336f5](https://github.com/rexxars/bundle-stats/commit/7b336f528516b7fcbfed5c6cf0e8f3d944ad87e9))
+
 ## [1.11.1](https://github.com/rexxars/bundle-stats/compare/v1.11.0...v1.11.1) (2026-03-30)
 
 ### Bug Fixes
