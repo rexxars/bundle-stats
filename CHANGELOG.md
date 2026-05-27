@@ -5,6 +5,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.11.3](https://github.com/rexxars/bundle-stats/compare/v1.11.2...v1.11.3) (2026-05-27)
+
+### Bug Fixes
+
+- clarify "no exports" error message when filtering ([a8a6cdf](https://github.com/rexxars/bundle-stats/commit/a8a6cdf1ce18e898b056e2e679ebac161a3e8939))
+
 ## [1.11.2](https://github.com/rexxars/bundle-stats/compare/v1.11.1...v1.11.2) (2026-04-01)
 
 ### Bug Fixes
