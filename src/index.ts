@@ -63,8 +63,19 @@ export async function generateReport(
 
   if (entries.length === 0) {
     const pkg = readPackageJson(packagePath)
+    const filterParts: string[] = []
+    if (onlyPatterns.length > 0) filterParts.push(`--only=${onlyPatterns.join(',')}`)
+    if (ignorePatterns.length > 0) filterParts.push(`--ignore=${ignorePatterns.join(',')}`)
+
+    if (filterParts.length > 0) {
+      throw new Error(
+        `No exports or bin entries in ${pkg.name} matched the active filters (${filterParts.join(', ')}). ` +
+          'Check that the package has entries matching your --only / --ignore patterns.',
+      )
+    }
+
     throw new Error(
-      `No "exports" or "bin" entries found in ${pkg.name}. ` +
+      `No measurable "exports" or "bin" entries found in ${pkg.name}. ` +
         'At least one must be present in package.json.',
     )
   }
