@@ -21,6 +21,10 @@ export function compareReports(current: Report, baseline: Report): ComparisonRep
     const currentEntry = currentScenarios.get(key)
     const baselineEntry = baselineScenarios.get(key)
     if (currentEntry && baselineEntry) {
+      if (isUnavailableConsumerEntry(baselineEntry.result) && !hasErrors(currentEntry.result)) {
+        changes.push(changeForAddedScenario(currentEntry.packageName, currentEntry.result))
+        continue
+      }
       changes.push(
         compareScenario(
           currentEntry.packageName,
@@ -192,6 +196,16 @@ function flattenScenarios(
 
 function hasErrors(result: ScenarioResult): boolean {
   return result.diagnostics.some((diagnostic) => diagnostic.severity === 'error')
+}
+
+function isUnavailableConsumerEntry(result: ScenarioResult): boolean {
+  return (
+    result.scenario.kind === 'consumer' &&
+    result.scenario.inputHash === null &&
+    result.diagnostics.some(
+      (diagnostic) => diagnostic.severity === 'error' && diagnostic.phase === 'discovery',
+    )
+  )
 }
 
 function assertCompatibleReport(report: Report, label: string): void {

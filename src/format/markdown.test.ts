@@ -59,3 +59,30 @@ test('summarizes added scenarios without calling them significant', () => {
   assert.match(markdown, /\[!NOTE\]\n> 1 scenario added\./)
   assert.doesNotMatch(markdown, /No significant changes/)
 })
+
+test('does not expose a missing baseline consumer entry as a measurement error', () => {
+  const baselineResult = createTestResult('consumer:readme-minimal', 0, 0)
+  baselineResult.bundle = null
+  baselineResult.diagnostics = [
+    {
+      severity: 'error',
+      phase: 'discovery',
+      message: 'Consumer scenario "readme-minimal" was not found at /fixture/readme-minimal.ts',
+    },
+  ]
+  const baseline = createTestReport(baselineResult)
+  const current = createTestReport(
+    createTestResult('consumer:readme-minimal', 17_118, 5_508, 'current'),
+  )
+
+  const markdown = formatMarkdown(compareReports(current, baseline))
+
+  assert.match(markdown, /\[!NOTE\]\n> 1 scenario added\./)
+  assert.match(markdown, /➕ `readme-minimal` \(consumer\)  \nAdded/)
+  assert.match(
+    markdown,
+    /\| ➕ readme-minimal \| consumer \| 16\.7 KB \/ 5\.4 KB \| N\/A \| None \| N\/A \|/,
+  )
+  assert.doesNotMatch(markdown, /was not found/)
+  assert.doesNotMatch(markdown, /❌/)
+})

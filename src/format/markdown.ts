@@ -109,8 +109,8 @@ function formatAllChanges(changes: ScenarioComparison[]): string[] {
     const scenarioName = includePackageName ? `${change.packageName} / ${change.name}` : change.name
     lines.push(
       `| ${changeIcon(change)} ${escapeCell(scenarioName)} | ` +
-        `${change.kind} | ${bundleValue} | ${formatDeltaCell(change.gzipSize, formatBytes)} | ` +
-        `${importValue} | ${formatDeltaCell(change.importTime, formatMs)} |`,
+        `${change.kind} | ${bundleValue} | ${formatDeltaCell(change, change.gzipSize, formatBytes)} | ` +
+        `${importValue} | ${formatDeltaCell(change, change.importTime, formatMs)} |`,
     )
   }
   return lines
@@ -139,7 +139,12 @@ function formatMetricChange(
   )
 }
 
-function formatDeltaCell(value: DeltaValue | null, formatter: (value: number) => string): string {
+function formatDeltaCell(
+  change: ScenarioComparison,
+  value: DeltaValue | null,
+  formatter: (value: number) => string,
+): string {
+  if (change.status !== 'changed') return 'N/A'
   if (value === null || value.delta === 0) return 'None'
   return formatDeltaOnly(value, formatter).replace('|', '\\|')
 }
