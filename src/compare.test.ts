@@ -23,3 +23,26 @@ test('marks changed consumer source as not comparable', () => {
   assert.equal(comparison.changes[0].significance, 'input-changed')
   assert.equal(comparison.summary.inputChanged, 1)
 })
+
+test('treats a consumer entry missing only from the baseline as added', () => {
+  const baselineResult = createTestResult('consumer:readme-minimal', 0, 0)
+  baselineResult.bundle = null
+  baselineResult.diagnostics = [
+    {
+      severity: 'error',
+      phase: 'discovery',
+      message: 'Consumer scenario "readme-minimal" was not found at /fixture/readme-minimal.ts',
+    },
+  ]
+  const baseline = createTestReport(baselineResult)
+  const current = createTestReport(
+    createTestResult('consumer:readme-minimal', 17_118, 5_508, 'current'),
+  )
+
+  const comparison = compareReports(current, baseline)
+
+  assert.equal(comparison.changes[0].status, 'added')
+  assert.equal(comparison.changes[0].baseline, null)
+  assert.equal(comparison.summary.added, 1)
+  assert.equal(comparison.summary.errors, 0)
+})
