@@ -128,7 +128,7 @@ jobs:
           max-bundle-size-gzip: 100kb
 ```
 
-The action automatically checks out the PR base, builds, measures, then does the same for the PR head, and posts a comparison comment on the PR. If thresholds are exceeded, the check fails.
+The action automatically checks out the PR base, installs dependencies, builds, measures, then does the same for the PR head, and posts a comparison comment on the PR. If thresholds are exceeded, the check fails.
 
 ### Action Inputs
 

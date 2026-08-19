@@ -85,6 +85,56 @@ resolve_package() {
   echo "$found"
 }
 
+# Name of the lockfile for the detected package manager, relative to cwd.
+# Prints an empty string if npm is in use without a committed lockfile.
+lockfile_name() {
+  local pm
+  pm="$(detect_pm)"
+
+  case "$pm" in
+    pnpm) echo "pnpm-lock.yaml" ;;
+    yarn) echo "yarn.lock" ;;
+    npm)
+      if [[ -f "package-lock.json" ]]; then
+        echo "package-lock.json"
+      fi
+      ;;
+  esac
+}
+
+# Install dependencies for whatever ref is currently checked out.
+# Checkout only changes tracked files, so node_modules is left over from
+# whichever ref was installed last. Call this after a checkout whenever
+# node_modules needs to be brought back in sync with that ref's lockfile.
+install_deps() {
+  local pm
+  pm="$(detect_pm)"
+
+  echo "Installing dependencies (${pm})..."
+
+  case "$pm" in
+    pnpm)
+      pnpm install --frozen-lockfile
+      ;;
+    yarn)
+      # Berry lockfiles carry a `__metadata` block; classic ones don't.
+      # `.yarnrc.yml` isn't a reliable marker since it's optional in Berry.
+      if grep -q '^__metadata:' yarn.lock 2>/dev/null; then
+        yarn install --immutable
+      else
+        yarn install --frozen-lockfile
+      fi
+      ;;
+    npm)
+      if [[ -f "package-lock.json" ]]; then
+        npm ci
+      else
+        npm install --no-audit --no-fund
+      fi
+      ;;
+  esac
+}
+
 # Resolve comma-separated package inputs to newline-separated paths.
 # Usage: resolve_packages "pkg1, pkg2, ./path"
 resolve_packages() {
