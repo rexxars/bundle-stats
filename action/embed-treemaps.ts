@@ -62,9 +62,11 @@ interface TreemapEmbed {
 const links: TreemapLink[] = []
 const embeds: TreemapEmbed[] = []
 const oversized: string[] = []
+const reports = reportPaths.map((reportPath) => readReport(reportPath))
+const includePackageName =
+  new Set(reports.flatMap((report) => report.packages.map((pkg) => pkg.name))).size > 1
 
-for (const reportPath of reportPaths) {
-  const report = readReport(reportPath)
+for (const report of reports) {
   for (const pkg of report.packages) {
     for (const result of pkg.scenarios) {
       const treemapPath = result.bundle?.treemapPath
@@ -74,7 +76,9 @@ for (const reportPath of reportPaths) {
 
       const encoded = gzipSync(compactTreemapData(json)).toString('base64url')
       const key = `${pkg.name}:${result.scenario.id}`
-      const label = `${pkg.name} / ${result.scenario.name}`
+      const label = includePackageName
+        ? `${pkg.name} / ${result.scenario.name}`
+        : result.scenario.name
       if (encoded.length <= MAX_INLINE_LENGTH) {
         links.push({label, url: `${VIEWER_BASE}#data=${encoded}`})
       } else if (isPublic && commentApiUrl) {

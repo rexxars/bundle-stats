@@ -12,6 +12,7 @@ export function formatMarkdown(
   const {summary} = comparison
   const lines = ['## Bundle Stats', '']
   const notable = comparison.changes.filter(isNotable)
+  const significantChanges = summary.increases + summary.decreases
 
   if (summary.errors > 0) {
     lines.push(
@@ -19,16 +20,14 @@ export function formatMarkdown(
       `> ${plural(summary.errors, 'scenario has', 'scenarios have')} measurement errors.`,
       '',
     )
-  } else if (summary.regressions > 0) {
-    lines.push(
-      '> [!WARNING]',
-      `> ${plural(summary.regressions, 'significant regression', 'significant regressions')} detected.`,
-      '',
-    )
   } else if (notable.length === 0) {
     lines.push('✅ No significant changes.', '')
   } else {
-    lines.push('✅ No significant regressions.', '')
+    lines.push(
+      summary.increases > 0 ? '> [!WARNING]' : '> [!NOTE]',
+      `> ${formatNotableSummary(comparison, significantChanges, notable.length)}`,
+      '',
+    )
   }
 
   if (notable.length > 0) {
@@ -60,6 +59,8 @@ function formatNotableChanges(changes: ScenarioComparison[]): string[] {
       if (currentPackage) lines.push('')
       currentPackage = change.packageName
       lines.push(`### ${currentPackage}`, '')
+    } else {
+      lines.push('')
     }
     lines.push(formatNotableChange(change))
   }
@@ -69,24 +70,28 @@ function formatNotableChanges(changes: ScenarioComparison[]): string[] {
 function formatNotableChange(change: ScenarioComparison): string {
   const icon = changeIcon(change)
   const label = `\`${change.name}\` (${change.kind})`
-  if (change.status === 'added') return `- ${icon} ${label}: added`
-  if (change.status === 'removed') return `- ${icon} ${label}: removed`
+  if (change.status === 'added') return [`${icon} ${label}`, 'Added'].join('  \n')
+  if (change.status === 'removed') return [`${icon} ${label}`, 'Removed'].join('  \n')
   if (change.significance === 'input-changed') {
-    return `- ${icon} ${label}: consumer entry changed, so the size delta is not comparable`
+    return [
+      `${icon} ${label}`,
+      'Consumer entry changed, so the size change cannot be compared',
+    ].join('  \n')
   }
 
-  const details = formatDeltas(change)
+  const details = formatMetricChanges(change)
   if (details.length === 0) {
     const diagnostic =
       change.current?.diagnostics.find((item) => item.severity === 'error') ??
       change.baseline?.diagnostics.find((item) => item.severity === 'error')
-    return `- ${icon} ${label}: ${diagnostic?.message ?? 'not comparable'}`
+    return [`${icon} ${label}`, diagnostic?.message ?? 'Cannot be compared'].join('  \n')
   }
-  return `- ${icon} ${label}: ${details.join('; ')}`
+  return [`${icon} ${label}`, ...details].join('  \n')
 }
 
 function formatAllChanges(changes: ScenarioComparison[]): string[] {
   if (changes.length === 0) return ['No scenarios were present in either report.']
+  const includePackageName = new Set(changes.map((change) => change.packageName)).size > 1
   const lines = [
     '| Scenario | Kind | Bundle (raw / gzip) | Gzip change | Import time | Import change |',
     '| --- | --- | ---: | ---: | ---: | ---: |',
@@ -96,13 +101,14 @@ function formatAllChanges(changes: ScenarioComparison[]): string[] {
     const bundle = current?.bundle
     const bundleValue = bundle
       ? `${formatBytes(bundle.rawBytes)} / ${formatBytes(bundle.gzipBytes)}`
-      : '-'
+      : 'None'
     const importValue =
       current?.importTime && !current.importTime.failed
         ? formatMs(current.importTime.medianMs)
-        : '-'
+        : 'None'
+    const scenarioName = includePackageName ? `${change.packageName} / ${change.name}` : change.name
     lines.push(
-      `| ${changeIcon(change)} ${escapeCell(change.packageName)} / ${escapeCell(change.name)} | ` +
+      `| ${changeIcon(change)} ${escapeCell(scenarioName)} | ` +
         `${change.kind} | ${bundleValue} | ${formatDeltaCell(change.gzipSize, formatBytes)} | ` +
         `${importValue} | ${formatDeltaCell(change.importTime, formatMs)} |`,
     )
@@ -110,18 +116,31 @@ function formatAllChanges(changes: ScenarioComparison[]): string[] {
   return lines
 }
 
-function formatDeltas(change: ScenarioComparison): string[] {
+function formatMetricChanges(change: ScenarioComparison): string[] {
   const values: string[] = []
-  if (change.gzipSize) values.push(`gzip ${formatDeltaOnly(change.gzipSize, formatBytes)}`)
-  if (change.rawSize) values.push(`raw ${formatDeltaOnly(change.rawSize, formatBytes)}`)
+  if (change.gzipSize) values.push(formatMetricChange('Gzip', change.gzipSize, formatBytes))
+  if (change.rawSize) values.push(formatMetricChange('Raw', change.rawSize, formatBytes))
   if (change.importTime) {
-    values.push(`import ${formatDeltaOnly(change.importTime, formatMs)}`)
+    values.push(formatMetricChange('Import', change.importTime, formatMs))
   }
   return values
 }
 
+function formatMetricChange(
+  label: string,
+  value: DeltaValue,
+  formatter: (value: number) => string,
+): string {
+  if (value.delta === 0) return `${label}: ${formatter(value.after)}, no change`
+  const direction = value.delta > 0 ? 'up' : 'down'
+  return (
+    `${label}: ${formatter(value.after)}, ${direction} ${formatter(Math.abs(value.delta))} ` +
+    `(${Math.abs(value.percent).toFixed(1)}%)`
+  )
+}
+
 function formatDeltaCell(value: DeltaValue | null, formatter: (value: number) => string): string {
-  if (value === null || value.delta === 0) return '-'
+  if (value === null || value.delta === 0) return 'None'
   return formatDeltaOnly(value, formatter).replace('|', '\\|')
 }
 
@@ -130,13 +149,42 @@ function isNotable(change: ScenarioComparison): boolean {
 }
 
 function changeIcon(change: ScenarioComparison): string {
-  if (change.significance === 'regression') return '🔴'
-  if (change.significance === 'improvement') return '🟢'
+  if (change.significance === 'increase') return '🔴'
+  if (change.significance === 'decrease') return '🟢'
   if (change.significance === 'input-changed') return '⚠️'
   if (change.status === 'added') return '➕'
   if (change.status === 'removed') return '➖'
   if (change.significance === 'not-comparable') return '❌'
   return '⚪'
+}
+
+function formatNotableSummary(
+  comparison: ComparisonReport,
+  significantChanges: number,
+  notableChanges: number,
+): string {
+  const {summary} = comparison
+  const parts: string[] = []
+  if (significantChanges > 0) {
+    parts.push(plural(significantChanges, 'significant change', 'significant changes'))
+  }
+  if (summary.added > 0) parts.push(plural(summary.added, 'scenario added', 'scenarios added'))
+  if (summary.removed > 0) {
+    parts.push(plural(summary.removed, 'scenario removed', 'scenarios removed'))
+  }
+  if (summary.inputChanged > 0) {
+    parts.push(plural(summary.inputChanged, 'consumer entry changed', 'consumer entries changed'))
+  }
+  if (parts.length === 0) {
+    return `${plural(notableChanges, 'change needs', 'changes need')} review.`
+  }
+  return `${joinList(parts)}.`
+}
+
+function joinList(values: string[]): string {
+  if (values.length === 1) return values[0]
+  if (values.length === 2) return `${values[0]} and ${values[1]}`
+  return `${values.slice(0, -1).join(', ')}, and ${values.at(-1)}`
 }
 
 function formatThresholdNote(comparison: ComparisonReport): string {

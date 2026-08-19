@@ -51,8 +51,8 @@ export function compareReports(current: Report, baseline: Report): ComparisonRep
     baseline,
     changes,
     summary: {
-      regressions: changes.filter((change) => change.significance === 'regression').length,
-      improvements: changes.filter((change) => change.significance === 'improvement').length,
+      increases: changes.filter((change) => change.significance === 'increase').length,
+      decreases: changes.filter((change) => change.significance === 'decrease').length,
       insignificant: changes.filter((change) => change.significance === 'insignificant').length,
       added: changes.filter((change) => change.status === 'added').length,
       removed: changes.filter((change) => change.status === 'removed').length,
@@ -120,8 +120,8 @@ function classifyChange(
   const significantDeltas = [significantBundle, significantImport].filter(
     (value): value is DeltaValue => value !== null,
   )
-  if (significantDeltas.some((value) => value.delta > 0)) return 'regression'
-  if (significantDeltas.some((value) => value.delta < 0)) return 'improvement'
+  if (significantDeltas.some((value) => value.delta > 0)) return 'increase'
+  if (significantDeltas.some((value) => value.delta < 0)) return 'decrease'
   return 'insignificant'
 }
 

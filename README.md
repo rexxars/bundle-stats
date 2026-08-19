@@ -1,6 +1,6 @@
 # @rexxars/bundle-stats
 
-Measure the bundle cost of ESM package exports, command-line entry points, and named consumer scenarios. Compare two reports to find tree-shaking regressions, bundle-size changes, and import-time changes.
+Measure the bundle cost of ESM package exports, command-line entry points, and named consumer scenarios. Compare two reports to find unexpected tree-shaking, bundle-size, and import-time changes.
 
 bundle-stats v2 uses Rolldown and runs independent bundles concurrently. It requires Node.js 24 or later.
 
@@ -60,7 +60,7 @@ For example, `packages/client/bundle-tests/query-only.ts` can contain:
 export {parseQuery} from '../src/index.ts'
 ```
 
-Keep these files small and stable. If a consumer entry changes between reports, bundle-stats marks its result as not comparable. This prevents a fixture edit from appearing as a library regression or improvement.
+Keep these files small and stable. If a consumer entry changes between reports, bundle-stats marks its result as not comparable. This prevents a fixture edit from appearing as a library size increase or decrease.
 
 ## CLI
 
@@ -114,8 +114,8 @@ The report schema includes its engine version, environment, config fingerprint, 
 
 The Markdown report puts useful changes first:
 
-- 🔴 marks a significant regression.
-- 🟢 marks a significant improvement.
+- 🔴 marks a significant increase.
+- 🟢 marks a significant decrease.
 - ⚠️ marks a changed consumer input.
 - ➕ and ➖ mark added and removed scenarios.
 - ❌ marks a measurement error or a result that cannot be compared.
@@ -176,7 +176,7 @@ Available action inputs:
 - `head-ref`: Current Git ref. `GITHUB_SHA` is the default.
 - `comment-id`: Stable suffix for independent comments. The default is `default`.
 
-The action fails after posting its report if the current measurement contains errors. Significant regressions are annotations, not failures. This keeps significance focused on review noise instead of turning every size change into a policy decision.
+The action fails after posting its report if the current measurement contains errors. Significant changes are annotations, not failures. This keeps significance focused on review noise instead of turning every size change into a policy decision.
 
 ## Library API
 

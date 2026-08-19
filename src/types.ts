@@ -174,8 +174,8 @@ export interface DeltaValue {
 }
 
 export type ChangeSignificance =
-  | 'regression'
-  | 'improvement'
+  | 'increase'
+  | 'decrease'
   | 'insignificant'
   | 'input-changed'
   | 'not-comparable'
@@ -200,8 +200,8 @@ export interface ComparisonReport {
   baseline: Report
   changes: ScenarioComparison[]
   summary: {
-    regressions: number
-    improvements: number
+    increases: number
+    decreases: number
     insignificant: number
     added: number
     removed: number

@@ -9,8 +9,8 @@ export function formatCli(comparison: ComparisonReport): string {
   const {summary} = comparison
   const lines = [
     styleText('bold', 'Bundle Stats'),
-    `${summary.regressions} regressions, ${summary.improvements} improvements, ` +
-      `${summary.insignificant} insignificant changes`,
+    `${summary.increases} significant increases, ${summary.decreases} significant decreases, ` +
+      `${summary.insignificant} changes below the threshold`,
   ]
 
   const notable = comparison.changes.filter(isNotable)
@@ -22,10 +22,10 @@ export function formatCli(comparison: ComparisonReport): string {
   for (const change of notable) {
     const label = `${change.packageName} / ${change.name}`
     const details = formatChangeDetails(change)
-    if (change.significance === 'regression') {
-      lines.push(styleText('red', `REGRESSION ${label}${details}`))
-    } else if (change.significance === 'improvement') {
-      lines.push(styleText('green', `IMPROVEMENT ${label}${details}`))
+    if (change.significance === 'increase') {
+      lines.push(styleText('red', `INCREASE ${label}${details}`))
+    } else if (change.significance === 'decrease') {
+      lines.push(styleText('green', `DECREASE ${label}${details}`))
     } else {
       lines.push(styleText('yellow', `${changeLabel(change)} ${label}${details}`))
     }
