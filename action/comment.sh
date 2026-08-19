@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # PR comment management functions.
-# Sourced by run.sh — expects GITHUB_REPOSITORY and PR_NUMBER in the environment.
+# Sourced by run.sh. Expects GITHUB_REPOSITORY and PR_NUMBER in the environment.
 
 # Legacy marker for backward compatibility with existing PR comments.
 LEGACY_COMMENT_MARKER='<!-- bundle-stats-comment -->'
-# Current marker — overridden by run.sh after package resolution to include
+# Current marker. run.sh overrides it with a unique suffix.
 # a unique suffix (package names or explicit comment-id input).
 COMMENT_MARKER="$LEGACY_COMMENT_MARKER"
 
@@ -74,7 +74,7 @@ ${1}"
 post_calculating() {
   local pkg_list="$1"
   upsert_comment "$(cat <<EOF
-:hourglass_flowing_sand: **Bundle Stats** — Calculating bundle sizes for ${pkg_list}...
+:hourglass_flowing_sand: **Bundle Stats**: Calculating bundle sizes for ${pkg_list}...
 EOF
 )"
 }
@@ -84,7 +84,7 @@ EOF
 post_error() {
   local error_output="$1"
   upsert_comment "$(cat <<EOF
-:x: **Bundle Stats** — An error occurred while calculating bundle sizes.
+:x: **Bundle Stats**: An error occurred while calculating bundle sizes.
 
 <details>
 <summary>Error details</summary>

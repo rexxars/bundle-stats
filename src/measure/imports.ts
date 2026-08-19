@@ -98,7 +98,12 @@ export async function measureImportTime(
     if (i > 0) {
       await sleep(opts.delayMs)
     }
-    const result = runSingleImport(specifier, opts.cwd, opts.unrestrictedReads, opts.allowChildProcess)
+    const result = runSingleImport(
+      specifier,
+      opts.cwd,
+      opts.unrestrictedReads,
+      opts.allowChildProcess,
+    )
     if (typeof result === 'number') {
       times.push(result)
     } else {

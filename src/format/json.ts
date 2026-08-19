@@ -1,5 +1,5 @@
-import type {Report} from '../types.ts'
+import type {ComparisonReport, Report} from '../types.ts'
 
-export function formatJson(report: Report): string {
-  return JSON.stringify(report, null, 2)
+export function formatJson(value: Report | ComparisonReport): string {
+  return JSON.stringify(value, null, 2)
 }

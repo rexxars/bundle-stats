@@ -1,107 +1,135 @@
 # @rexxars/bundle-stats
 
-Measure bundle sizes, bundled-with-deps sizes, and import times for any npm package's exports.
+Measure the bundle cost of ESM package exports, command-line entry points, and named consumer scenarios. Compare two reports to find tree-shaking regressions, bundle-size changes, and import-time changes.
 
-Generates reports in three formats (terminal, Markdown, JSON) and can compare against a baseline to show deltas — designed for CI workflows that post PR comments with size regressions.
+bundle-stats v2 uses Rolldown and runs independent bundles concurrently. It requires Node.js 24 or later.
 
 ## Install
 
 ```bash
-npm install -D @rexxars/bundle-stats
+npm install --save-dev @rexxars/bundle-stats
 ```
 
-Requires **Node.js 24** or later.
+## Configure scenarios
 
-## CLI Usage
+Create `bundle-stats.config.ts`:
+
+```ts
+import {defineConfig} from '@rexxars/bundle-stats/config'
+
+export default defineConfig({
+  packages: [
+    {
+      root: 'packages/client',
+      scenarios: {
+        exports: {
+          exclude: ['internal/**'],
+        },
+        bins: false,
+        entries: {
+          'query-only': './bundle-tests/query-only.ts',
+          'mutation-only': './bundle-tests/mutation-only.ts',
+        },
+      },
+      importTime: {
+        exports: true,
+        runs: 7,
+      },
+    },
+  ],
+  concurrency: 2,
+  platform: 'browser',
+  significance: {
+    bundle: {bytes: 1024, percent: 1},
+    importTime: {milliseconds: 5, percent: 10},
+  },
+})
+```
+
+Package roots are relative to the config file. Consumer entry paths are relative to their package root.
+
+Exports and bins are enabled by default. Import-time measurement is enabled for exports and disabled for bins. Named consumer entries only measure bundle size.
+
+### Consumer entries
+
+A consumer entry describes one use of the package. Rolldown starts at that file, applies tree shaking, bundles non-peer dependencies, and records the final raw and gzip sizes.
+
+For example, `packages/client/bundle-tests/query-only.ts` can contain:
+
+```ts
+export {parseQuery} from '../src/index.ts'
+```
+
+Keep these files small and stable. If a consumer entry changes between reports, bundle-stats marks its result as not comparable. This prevents a fixture edit from appearing as a library regression or improvement.
+
+## CLI
+
+The v2 CLI separates measurement from comparison.
+
+Measure the configured scenarios:
 
 ```bash
-bundle-stats [options]
+bundle-stats measure --output current.json
 ```
 
-### Options
-
-| Flag                          | Description                                                                | Default          |
-| ----------------------------- | -------------------------------------------------------------------------- | ---------------- |
-| `--package <path>`            | Path to target package directory or its `package.json`                     | `.`              |
-| `--format <fmt>`              | Output format: `cli`, `markdown`, or `json`                                | `cli`            |
-| `--compare <path\|->` | Baseline JSON report for delta comparison (`-` reads stdin)                         |                  |
-| `--compare-npm <ver>`         | Compare against a published npm version (e.g. `latest`, `5.12.0`)         |                  |
-| `--ignore <pattern>`          | Glob pattern to skip exports (repeatable)                                  |                  |
-| `--only <pattern>`            | Only include matching exports (repeatable)                                 |                  |
-| `--conditions <name>`         | Export conditions to measure separately (repeatable)                       |                  |
-| `--no-benchmark`              | Skip import time benchmarks                                                |                  |
-| `--no-bundle`                 | Skip Rollup bundling and treemap generation                                |                  |
-| `--no-bin-benchmark`          | Skip import time benchmarks for bin entries                                |                  |
-| `--allow-bin-child-process`   | Allow bin entries to spawn child processes during import benchmarks         |                  |
-| `--ref-label <label>`         | Label stored in the report to identify the measured ref                    |                  |
-| `--outdir <path>`             | Directory for treemap HTML artifacts                                       | `.bundle-stats/` |
-
-### Examples
-
-Run a full report on the current directory:
+Measure another ref, then compare the two stored reports:
 
 ```bash
-bundle-stats
+bundle-stats measure \
+  --ref-label "main (abc12345)" \
+  --output baseline.json
+
+bundle-stats compare \
+  --baseline baseline.json \
+  --current current.json \
+  --format markdown \
+  --output comment.md
 ```
 
-Report on a specific package, skipping slow steps:
+`compare` never builds or measures code. Reformatting a report is cheap and cannot measure the current ref a second time.
+
+Resolve a TypeScript config to JSON for use across Git checkouts:
 
 ```bash
-bundle-stats --package packages/sanity --no-bundle --no-benchmark
+bundle-stats resolve-config --output resolved-config.json
+bundle-stats measure --resolved-config resolved-config.json --output report.json
 ```
 
-Generate a JSON baseline, then compare a later run against it:
+Run `bundle-stats --help` for all command options.
 
-```bash
-# save baseline
-bundle-stats --format json > baseline.json
+## What gets measured
 
-# ... make changes, rebuild ...
+- Export scenarios bundle each concrete ESM subpath in `package.json#exports`.
+- Consumer scenarios bundle a named JavaScript or TypeScript input file.
+- Bin scenarios bundle each ESM entry in `package.json#bin`.
+- Bundle measurements include raw bytes, gzip bytes, and an HTML treemap.
+- Import measurements use isolated Node.js processes and report the trimmed median.
+- Peer dependencies and native `.node` addons stay external.
 
-# compare
-bundle-stats --format markdown --compare baseline.json > comment.md
-```
+The tool, config files, package entry points, and consumer entries are ESM-only. CommonJS package entry points are reported as errors. Rolldown can still process CommonJS code found inside the dependency graph of an ESM entry.
 
-Pipe the baseline via stdin:
+The report schema includes its engine version, environment, config fingerprint, scenario kind, diagnostics, and consumer input hashes. v1 report JSON is not compatible with v2.
 
-```bash
-cat baseline.json | bundle-stats --format markdown --compare -
-```
+## Significant changes
 
-Compare against the latest published npm version:
+The Markdown report puts useful changes first:
 
-```bash
-bundle-stats --compare-npm latest --format markdown
-```
+- 🔴 marks a significant regression.
+- 🟢 marks a significant improvement.
+- ⚠️ marks a changed consumer input.
+- ➕ and ➖ mark added and removed scenarios.
+- ❌ marks a measurement error or a result that cannot be compared.
+- ⚪ marks a small change in the detailed section.
 
-Compare against a specific published version:
+A bundle change is significant when its gzip delta reaches both configured limits. The defaults are 1 KB and 1 percent. An import-time change must reach both 5 milliseconds and 10 percent.
 
-```bash
-bundle-stats --compare-npm 5.12.0
-```
-
-Skip specific exports:
-
-```bash
-bundle-stats --ignore cli --ignore _internal
-```
-
-## What It Measures
-
-The tool reads the `exports` and `bin` fields in your `package.json` and runs three measurement passes:
-
-| Metric            | Description                                                                                         |
-| ----------------- | --------------------------------------------------------------------------------------------------- |
-| **Internal size** | Own source code reachable from the export entry (raw + gzip)                                        |
-| **Bundled size**  | Rollup bundle with all non-peer dependencies inlined (raw + gzip), plus an interactive treemap HTML |
-| **Import time**   | Median cold-start `import()` time in a sandboxed Node.js child process (10 runs, outliers trimmed)  |
+When nothing crosses a limit, the visible report says `No significant changes`. All scenario measurements remain available in a collapsed `<details>` section.
 
 ## GitHub Action
 
-The easiest way to use bundle-stats in CI. Add to your workflow:
-
 ```yaml
 name: Bundle Stats
+
 on:
   pull_request:
 
@@ -121,116 +149,75 @@ jobs:
         with:
           node-version: 24
 
-      - uses: rexxars/bundle-stats@v1
+      - uses: pnpm/action-setup@v4
+
+      - run: pnpm install --frozen-lockfile
+
+      - uses: rexxars/bundle-stats@v2
         with:
-          packages: 'sanity, @sanity/vision'
-          max-import-time: 500ms
-          max-bundle-size-gzip: 100kb
+          config: bundle-stats.config.ts
+          build-command: pnpm build
 ```
 
-The action automatically checks out the PR base, installs dependencies, builds, measures, then does the same for the PR head, and posts a comparison comment on the PR. If thresholds are exceeded, the check fails.
+The action performs these operations:
 
-### Action Inputs
+1. Resolve the config once from the head checkout.
+2. Build and measure the base ref once.
+3. Build and measure the head ref once.
+4. Compare the two JSON reports.
+5. Update one PR comment and upload current treemaps.
 
-| Input                     | Default     | Description                                                                   |
-| ------------------------- | ----------- | ----------------------------------------------------------------------------- |
-| `packages`                | `.`         | Comma-separated package names (resolved via workspaces) or paths              |
-| `build-script`            | `build`     | npm script to run per-package via PM filter syntax                            |
-| `build-command`           |             | Global build command (overrides per-package builds, for turbo/nx)             |
-| `base-ref`                | PR base SHA | Git ref for baseline measurement                                              |
-| `head-ref`                | Current SHA | Git ref for current measurement                                               |
-| `max-import-time`         |             | Max import time per export (e.g. `500ms`)                                     |
-| `max-bundle-size-gzip`    |             | Max gzip bundle size per export (e.g. `100kb`)                                |
-| `max-bundle-size-raw`     |             | Max raw bundle size per export (e.g. `500kb`)                                 |
-| `max-internal-size-gzip`  |             | Max gzip internal size per export (e.g. `50kb`)                               |
-| `max-internal-size-raw`   |             | Max raw internal size per export (e.g. `200kb`)                               |
-| `ignore`                  |             | Comma-separated glob patterns to skip exports                                 |
-| `only`                    |             | Comma-separated glob patterns for exports to include                          |
-| `no-benchmark`            | `false`     | Skip import time benchmarks                                                   |
-| `no-bundle`               | `false`     | Skip Rollup bundling                                                          |
-| `no-bin-benchmark`        | `false`     | Skip import time benchmarks for bin entries                                   |
-| `allow-bin-child-process` | `false`     | Allow bin entries to spawn child processes during import benchmarks            |
-| `conditions`              |             | Space-separated export conditions to measure separately                       |
-| `compare-npm`             |             | Compare against a published npm version (e.g. `latest`, `5.12.0`)            |
-| `comment-id`              |             | Unique identifier for the PR comment (prevents collisions with other actions) |
+Available action inputs:
 
-## Manual CI Usage
+- `config`: Config path. The default is `bundle-stats.config.ts`.
+- `build-script`: Per-package npm script. The default is `build`.
+- `build-command`: One command that replaces per-package builds.
+- `base-ref`: Baseline Git ref. The pull request base SHA is the default.
+- `head-ref`: Current Git ref. `GITHUB_SHA` is the default.
+- `comment-id`: Stable suffix for independent comments. The default is `default`.
 
-For more control, call the CLI directly from your workflow steps:
-
-```yaml
-env:
-  BUNDLE_STATS: npx bundle-stats
-
-steps:
-  # ... build steps ...
-
-  - name: Generate baseline report
-    run: $BUNDLE_STATS --package packages/my-lib --no-benchmark --format json > /tmp/baseline.json
-
-  # ... rebuild after changes ...
-
-  - name: Generate comparison report
-    run: |
-      cat /tmp/baseline.json | \
-        $BUNDLE_STATS --package packages/my-lib --format markdown --compare - \
-        > /tmp/comment.md
-
-  - name: Post PR comment
-    uses: thollander/actions-comment-pull-request@v3
-    with:
-      comment-tag: bundle-stats
-      file-path: /tmp/comment.md
-```
+The action fails after posting its report if the current measurement contains errors. Significant regressions are annotations, not failures. This keeps significance focused on review noise instead of turning every size change into a policy decision.
 
 ## Library API
 
-The package also exports a programmatic API:
-
 ```ts
-import {generateReport, compareReports, formatMarkdown} from '@rexxars/bundle-stats'
+import {compareReports, formatMarkdown, loadConfig, measure} from '@rexxars/bundle-stats'
 
-const report = await generateReport({
-  packagePath: './packages/my-lib',
-  ignorePatterns: ['_internal'],
-  noBenchmark: false,
-  noBundle: false,
-  outdir: '.bundle-stats',
-})
-
-// Optional: compare against a previous report
-const comparison = compareReports(report, baselineReport)
-const markdown = formatMarkdown(report, comparison)
+const config = await loadConfig()
+const baseline = await measure(config, {refLabel: 'main'})
+const current = await measure(config, {refLabel: 'feature'})
+const comparison = compareReports(current, baseline)
+const markdown = formatMarkdown(comparison)
 ```
 
-## Treemap Viewer
+`@rexxars/bundle-stats/config` exports `defineConfig` and its config types without loading the measurement implementation.
 
-Bundle reports include interactive treemap HTML files (generated by [rollup-plugin-visualizer](https://github.com/nicolo-ribaudo/rollup-plugin-visualizer)) that show exactly where bundle weight comes from. A hosted viewer at [rexxars.github.io/bundle-stats](https://rexxars.github.io/bundle-stats/) lets you open these treemaps directly from PR comments — no server involved.
+## Moving from v1
 
-The viewer works entirely client-side: the treemap JSON data is gzip-compressed, base64url-encoded, and embedded in the URL fragment (`#data=...`). Since browsers never send the fragment to the server, the data stays local to your browser. The GitHub Action automatically generates these one-click links in PR comments when the encoded data fits within URL length limits (~1.5 MB). For larger bundles, treemap HTML files are uploaded as CI artifacts instead.
+v2 is intentionally incompatible with v1:
+
+- Replace the option-based CLI with `resolve-config`, `measure`, and `compare`.
+- Replace action package and threshold inputs with `bundle-stats.config.ts`.
+- Replace `generateReport()` with `loadConfig()` and `measure()`.
+- Replace export-specific result handling with package and scenario results.
+- Regenerate stored baselines because the report schema and bundling engine changed.
+- Remove CommonJS configs and package entry points.
+
+The internal-size source scan and npm-version comparison are not part of v2. Consumer scenarios provide a more direct tree-shaking check than the internal-size approximation.
 
 ## Development
 
-Node 24 runs TypeScript natively, so you can work on the source without a build step:
+Node.js 24 can run the TypeScript source directly:
 
 ```bash
-# Run directly from source — no compilation needed
 node bin/bundle-stats.ts --help
-node bin/bundle-stats.ts --package /path/to/some-package --no-bundle --no-benchmark
+pnpm test
+pnpm check:types
+pnpm lint
+pnpm build
 ```
 
-### Scripts
-
-```bash
-pnpm build          # Compile to dist/ with tsup
-pnpm check:types    # Type-check with tsc
-pnpm lint           # ESLint
-pnpm lint:fix       # ESLint with auto-fix
-pnpm check:format   # Prettier check
-pnpm format         # Prettier write
-```
-
-Build is only needed for publishing to npm — `bin/bundle-stats.js` imports from `dist/`, while `bin/bundle-stats.ts` imports from `src/` directly.
+Published files are built as ESM with tsdown.
 
 ## License
 

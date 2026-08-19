@@ -117,8 +117,8 @@ install_deps() {
       pnpm install --frozen-lockfile
       ;;
     yarn)
-      # Berry lockfiles carry a `__metadata` block; classic ones don't.
-      # `.yarnrc.yml` isn't a reliable marker since it's optional in Berry.
+      # Berry lockfiles carry a `__metadata` block; classic ones do not.
+      # `.yarnrc.yml` is optional in Berry, so it is not a reliable marker.
       if grep -q '^__metadata:' yarn.lock 2>/dev/null; then
         yarn install --immutable
       else
