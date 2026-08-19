@@ -5,6 +5,12 @@
 All notable changes to this project will be documented in this file. See
 [Conventional Commits](https://conventionalcommits.org) for commit guidelines.
 
+## [1.11.4](https://github.com/rexxars/bundle-stats/compare/v1.11.3...v1.11.4) (2026-08-19)
+
+### Bug Fixes
+
+- reinstall dependencies when they differ between base and head refs ([#22](https://github.com/rexxars/bundle-stats/issues/22)) ([556aa31](https://github.com/rexxars/bundle-stats/commit/556aa3192cf07fed6d86583aabc393eed5670897)), closes [#21](https://github.com/rexxars/bundle-stats/issues/21)
+
 ## [1.11.3](https://github.com/rexxars/bundle-stats/compare/v1.11.2...v1.11.3) (2026-05-27)
 
 ### Bug Fixes
