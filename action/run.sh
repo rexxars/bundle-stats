@@ -234,8 +234,30 @@ WORK_DIR="$(mktemp -d)"
 
 echo "Fetching baseline ref: ${BASE_REF}"
 git fetch --depth=1 origin "$BASE_REF" 2>>"$ERROR_FILE"
+echo "Fetching head ref: ${HEAD_REF}"
+git fetch --depth=1 origin "$HEAD_REF" 2>>"$ERROR_FILE"
+
+# Only reinstall dependencies if the lockfile actually differs between base
+# and head. Most PRs don't touch it, so this keeps today's behavior (and CI
+# time) unchanged for the common case, while fixing the baseline build when
+# a dependency (e.g. a workspace:-protocol one) was added or removed.
+DEPS_CHANGED=0
+LOCKFILE_NAME="$(lockfile_name)"
+if [[ -n "$LOCKFILE_NAME" ]]; then
+  BASE_LOCKFILE_SHA="$(git rev-parse "${BASE_REF}:${LOCKFILE_NAME}" 2>/dev/null || echo "missing-base")"
+  HEAD_LOCKFILE_SHA="$(git rev-parse "${HEAD_REF}:${LOCKFILE_NAME}" 2>/dev/null || echo "missing-head")"
+  if [[ "$BASE_LOCKFILE_SHA" != "$HEAD_LOCKFILE_SHA" ]]; then
+    DEPS_CHANGED=1
+  fi
+fi
+
 echo "Checking out baseline: ${BASE_REF}"
 git checkout "$BASE_REF" 2>/dev/null
+
+if [[ "$DEPS_CHANGED" -eq 1 ]]; then
+  echo "Installing baseline dependencies..." >>"$ERROR_FILE"
+  install_deps 2>>"$ERROR_FILE"
+fi
 
 echo "Building baseline..." >>"$ERROR_FILE"
 run_builds "$PACKAGE_PATHS" 2>>"$ERROR_FILE"
@@ -248,10 +270,13 @@ while IFS= read -r pkg_path; do
   $BUNDLE_STATS --package "$pkg_path" --format json --ref-label "${BASE_BRANCH:-baseline} (${BASE_REF:0:8})" --outdir "${WORK_DIR}/treemaps" "${CLI_FLAGS[@]}" > "${WORK_DIR}/baseline-${slug}.json" 2>>"$ERROR_FILE"
 done <<< "$PACKAGE_PATHS"
 
-echo "Fetching head ref: ${HEAD_REF}"
-git fetch --depth=1 origin "$HEAD_REF" 2>>"$ERROR_FILE"
 echo "Checking out head: ${HEAD_REF}"
 git checkout "$HEAD_REF" 2>/dev/null
+
+if [[ "$DEPS_CHANGED" -eq 1 ]]; then
+  echo "Installing head dependencies..." >>"$ERROR_FILE"
+  install_deps 2>>"$ERROR_FILE"
+fi
 
 # --- 6. Measure current ---
 
