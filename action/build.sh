@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Build orchestration functions.
-# Sourced by run.sh — expects workspace.sh to be sourced first.
+# Sourced by run.sh. Expects workspace.sh to be sourced first.
 
 # Run builds for the given packages.
 # Usage: run_builds "path1\npath2\n..."
@@ -10,7 +10,7 @@
 run_builds() {
   local package_paths="$1"
 
-  # Global build command — run once and return.
+  # Run a configured global build command once.
   # eval is intentional: the build-command input is authored by the workflow
   # maintainer who already has full code execution control via the workflow file.
   if [[ -n "${INPUT_BUILD_COMMAND:-}" ]]; then

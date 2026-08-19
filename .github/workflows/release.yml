@@ -4,56 +4,176 @@ on:
   push:
     branches: [main]
 
-permissions:
-  contents: write
-  issues: write
-  pull-requests: write
-  id-token: write
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  release:
+  select-mode:
+    name: Select mode
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      mode: ${{ steps.select-mode.outputs.mode }}
+      publish-plan-artifact-id: ${{ steps.select-mode.outputs.publish-plan-artifact-id }}
     steps:
-      - uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@v7
         with:
-          fetch-depth: 0
+          persist-credentials: false
 
-      - uses: actions/setup-node@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
         with:
           node-version: 24
+          package-manager-cache: false
 
-      - uses: pnpm/action-setup@v4
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
 
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm knip
-      - run: pnpm test
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-      - name: Release
-        id: semantic-release
+      - name: Select Changesets mode
+        id: select-mode
+        uses: changesets/action/select-mode@v2
+
+  version:
+    name: Version
+    if: needs.select-mode.outputs.mode == 'version'
+    needs: select-mode
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Create or update version pull request
+        uses: changesets/action/version@v2
+        with:
+          script: pnpm changeset version
+          commit-message: 'chore: version packages'
+          pr-title: 'chore: version packages'
+
+  pack:
+    name: Validate and pack
+    if: needs.select-mode.outputs.mode == 'publish'
+    needs: select-mode
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      pack-dir-artifact-id: ${{ steps.pack.outputs.pack-dir-artifact-id }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          package-manager-cache: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Check types
+        run: pnpm check:types
+
+      - name: Test
+        run: pnpm test
+
+      - name: Find unused code
+        run: pnpm knip
+
+      - name: Build
+        run: pnpm build
+
+      - name: Pack release
+        id: pack
+        uses: changesets/action/pack@v2
+        with:
+          publish-plan-artifact-id: ${{ needs.select-mode.outputs.publish-plan-artifact-id }}
+
+  publish:
+    name: Publish
+    needs: pack
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org/
+          package-manager-cache: false
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install an OIDC-capable npm client
+        run: npm install --global npm@11.19.0
+
+      - name: Publish release
+        id: publish
+        uses: changesets/action/publish@v2
+        with:
+          pack-dir-artifact-id: ${{ needs.pack.outputs.pack-dir-artifact-id }}
+
+      - name: Update action major version tag
+        if: steps.publish.outputs.published == 'true'
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NPM_CONFIG_PROVENANCE: true
-        run: npx semantic-release
-
-      - name: Update major version tag
-        if: steps.semantic-release.outcome == 'success'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
+          PUBLISHED_PACKAGES: ${{ steps.publish.outputs.published-packages }}
         run: |
-          # Get the latest tag created by semantic-release
-          LATEST_TAG="$(git describe --tags --abbrev=0 2>/dev/null || echo '')"
-          if [[ -z "$LATEST_TAG" ]]; then
-            echo "No tag found, skipping major version tag update."
-            exit 0
+          PACKAGE_VERSION="$(node --input-type=module -e "const packages = JSON.parse(process.env.PUBLISHED_PACKAGES); const release = packages.find(({name}) => name === '@rexxars/bundle-stats'); if (release) process.stdout.write(release.version)")"
+          if [[ -z "$PACKAGE_VERSION" ]]; then
+            echo "The bundle-stats version was missing from the publish result."
+            exit 1
           fi
 
-          # Extract major version (e.g. v1.2.3 -> v1)
-          MAJOR="$(echo "$LATEST_TAG" | grep -oP '^v\d+')"
-          if [[ -z "$MAJOR" ]]; then
-            echo "Could not extract major version from ${LATEST_TAG}, skipping."
-            exit 0
-          fi
+          MAJOR_VERSION="${PACKAGE_VERSION%%.*}"
+          TAG="v${MAJOR_VERSION}"
 
-          echo "Moving ${MAJOR} tag to ${LATEST_TAG}"
-          git tag -f "$MAJOR" "$LATEST_TAG"
-          git push origin "$MAJOR" --force
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" >/dev/null 2>&1; then
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/${TAG}" -f sha="${GITHUB_SHA}" -F force=true
+          else
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" -f ref="refs/tags/${TAG}" -f sha="${GITHUB_SHA}"
+          fi

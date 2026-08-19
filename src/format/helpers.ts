@@ -11,13 +11,8 @@ export function formatBytes(bytes: number): string {
 export function formatMs(ms: number): string {
   const abs = Math.abs(ms)
   const sign = ms < 0 ? '-' : ''
-  if (abs < 1000) return `${sign}${Math.round(abs)}ms`
-  return `${sign}${(abs / 1000).toFixed(2)}s`
-}
-
-export function formatDelta(delta: DeltaValue, unitFn: (n: number) => string): string {
-  const sign = delta.delta >= 0 ? '+' : ''
-  return `${unitFn(delta.after)} (${sign}${unitFn(delta.delta)}, ${sign}${delta.percent.toFixed(1)}%)`
+  if (abs < 1000) return `${sign}${Math.round(abs)} ms`
+  return `${sign}${(abs / 1000).toFixed(2)} s`
 }
 
 /** Format only the delta portion: "+1.2 KB, +5.0%" or "-73.9 KB, -6.8%" */

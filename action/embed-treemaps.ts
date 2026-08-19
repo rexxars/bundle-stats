@@ -1,48 +1,21 @@
 #!/usr/bin/env node
 
-/**
- * Embed treemap viewer links into bundle-stats markdown output.
- *
- * Reads markdown from stdin. For each package report + treemap directory pair,
- * compacts treemap data and embeds it using a tiered strategy:
- *
- * 1. Small payloads (<=4K encoded): inline in URL fragment (#data=...)
- * 2. Large payloads + public repo: hidden HTML comment in markdown body,
- *    viewer link points to comment via GitHub API (#comment=...&export=...)
- * 3. Large payloads + private repo: artifact link only
- *
- * Usage:
- *   printf '%s' "$markdown" | node action/embed-treemaps.ts \
- *     --treemap-dir <dir> --report <path> \
- *     [--treemap-dir <dir2> --report <path2> ...] \
- *     --run-url <url> --comment-id <id> --repo <owner/repo> \
- *     --visibility <public|private|internal>
- */
+// @env node
 
 import {existsSync, readFileSync} from 'node:fs'
-import {join} from 'node:path'
 import {parseArgs} from 'node:util'
 import {gzipSync} from 'node:zlib'
 
-import type {Report} from '../src/types.ts'
+import {readReport} from '../src/report.ts'
 
 const VIEWER_BASE = 'https://rexxars.github.io/bundle-stats/'
-
-// GitHub enforces a 4,096-char limit on markdown link URLs.
-// https://github.com/orgs/community/discussions/48174
-// The viewer base URL is ~49 chars, leaving ~4,047 for the encoded payload.
 const MAX_INLINE_LENGTH = 4_000
-
-// GitHub comment body limit is 262,144 chars. Reserve margin for the visible
-// markdown content and leave the rest for hidden treemap data blocks.
 const MAX_COMMENT_BODY = 250_000
-
 const BACKTICK = '`'
 const PNPM_PATH_RE = /\/node_modules\/\.pnpm\/[^/]+\/node_modules\//g
 
 const {values} = parseArgs({
   options: {
-    'treemap-dir': {type: 'string', multiple: true},
     report: {type: 'string', multiple: true},
     'run-url': {type: 'string'},
     'comment-id': {type: 'string'},
@@ -52,29 +25,23 @@ const {values} = parseArgs({
   strict: true,
 })
 
-const treemapDirs = values['treemap-dir'] ?? []
 const reportPaths = values.report ?? []
 const runUrl = values['run-url']
 const commentId = values['comment-id']
 const repo = values.repo
 const visibility = values.visibility ?? 'public'
 
-if (treemapDirs.length === 0 || reportPaths.length === 0 || !runUrl) {
+if (reportPaths.length === 0 || !runUrl) {
   process.stderr.write(
-    'Usage: embed-treemaps.ts --treemap-dir <dir> --report <path> [...] --run-url <url> --comment-id <id> --repo <owner/repo> --visibility <vis>\n',
+    'Usage: embed-treemaps.ts --report <path> [...] --run-url <url> ' +
+      '--comment-id <id> --repo <owner/repo> --visibility <visibility>\n',
   )
   process.exit(2)
 }
 
-if (treemapDirs.length !== reportPaths.length) {
-  process.stderr.write('Each --treemap-dir must have a corresponding --report\n')
-  process.exit(2)
-}
-
-// Read markdown from stdin
-let md = ''
+let markdown = ''
 process.stdin.setEncoding('utf8')
-for await (const chunk of process.stdin) md += chunk
+for await (const chunk of process.stdin) markdown += chunk
 
 const isPublic = visibility === 'public'
 const commentApiUrl =
@@ -92,189 +59,127 @@ interface TreemapEmbed {
   encoded: string
 }
 
-interface PackageTreemaps {
-  links: TreemapLink[]
-  embeds: TreemapEmbed[]
-  oversized: string[]
-}
+const links: TreemapLink[] = []
+const embeds: TreemapEmbed[] = []
+const oversized: string[] = []
+const reports = reportPaths.map((reportPath) => readReport(reportPath))
+const includePackageName =
+  new Set(reports.flatMap((report) => report.packages.map((pkg) => pkg.name))).size > 1
 
-const multiPackage = treemapDirs.length > 1
-const packages: PackageTreemaps[] = []
+for (const report of reports) {
+  for (const pkg of report.packages) {
+    for (const result of pkg.scenarios) {
+      const treemapPath = result.bundle?.treemapPath
+      if (!treemapPath || !existsSync(treemapPath)) continue
+      const json = extractTreemapJson(readFileSync(treemapPath, 'utf8'))
+      if (!json) continue
 
-// Process each report separately to keep per-package treemap state
-for (let dirIdx = 0; dirIdx < treemapDirs.length; dirIdx++) {
-  const treemapDir = treemapDirs[dirIdx]
-  const reportPath = reportPaths[dirIdx]
-  const report = JSON.parse(readFileSync(reportPath, 'utf8')) as Report
-  const pkg: PackageTreemaps = {links: [], embeds: [], oversized: []}
-
-  for (const exp of report.exports) {
-    if (!exp.bundledSize) continue
-
-    const fname =
-      (exp.key === '.' ? 'index' : exp.key.replace(/^\.\//, '').replace(/\//g, '-')) + '.html'
-    const fpath = join(treemapDir, fname)
-    if (!existsSync(fpath)) continue
-
-    const html = readFileSync(fpath, 'utf8')
-    const json = extractTreemapJson(html)
-    if (!json) continue
-
-    const compacted = compactTreemapData(json)
-    const encoded = gzipSync(compacted).toString('base64url')
-
-    // In multi-package mode, scope the data key with package name to avoid
-    // collisions when multiple packages export the same key (e.g. ".")
-    const dataKey = multiPackage ? `${report.package}:${exp.key}` : exp.key
-
-    if (encoded.length <= MAX_INLINE_LENGTH) {
-      // Tier 1: small enough for inline URL
-      pkg.links.push({label: exp.key, url: `${VIEWER_BASE}#data=${encoded}`})
-    } else if (isPublic && commentApiUrl) {
-      // Tier 2: embed in comment, link via API
-      pkg.embeds.push({key: dataKey, encoded})
-      const exportParam = encodeURIComponent(dataKey)
-      const commentParam = encodeURIComponent(commentApiUrl)
-      pkg.links.push({
-        label: exp.key,
-        url: `${VIEWER_BASE}#comment=${commentParam}&export=${exportParam}`,
-      })
-    } else {
-      // Tier 3: too large and private/no comment ID — artifact fallback
-      pkg.oversized.push(exp.key)
-    }
-  }
-
-  packages.push(pkg)
-}
-
-// Check total size budget for embeds across all packages
-const allEmbeds = packages.flatMap((p) => p.embeds)
-let totalEmbedSize = allEmbeds.reduce((sum, e) => sum + e.encoded.length + e.key.length + 25, 0)
-if (md.length + totalEmbedSize > MAX_COMMENT_BODY) {
-  // Over budget — drop embeds from largest to smallest until we fit
-  const sorted = [...allEmbeds].sort((a, b) => b.encoded.length - a.encoded.length)
-  for (const embed of sorted) {
-    if (md.length + totalEmbedSize <= MAX_COMMENT_BODY) break
-    totalEmbedSize -= embed.encoded.length + embed.key.length + 25
-    // Find which package owns this embed and remove it
-    for (const pkg of packages) {
-      const idx = pkg.embeds.indexOf(embed)
-      if (idx < 0) continue
-      pkg.embeds.splice(idx, 1)
-      const linkIdx = pkg.links.findIndex(
-        (l) =>
-          l.url.includes(`export=${encodeURIComponent(embed.key)}`) && l.url.includes('comment='),
-      )
-      if (linkIdx >= 0) pkg.links.splice(linkIdx, 1)
-      pkg.oversized.push(embed.key)
-      break
+      const encoded = gzipSync(compactTreemapData(json)).toString('base64url')
+      const key = `${pkg.name}:${result.scenario.id}`
+      const label = includePackageName
+        ? `${pkg.name} / ${result.scenario.name}`
+        : result.scenario.name
+      if (encoded.length <= MAX_INLINE_LENGTH) {
+        links.push({label, url: `${VIEWER_BASE}#data=${encoded}`})
+      } else if (isPublic && commentApiUrl) {
+        embeds.push({key, encoded})
+        links.push({
+          label,
+          url:
+            `${VIEWER_BASE}#comment=${encodeURIComponent(commentApiUrl)}` +
+            `&export=${encodeURIComponent(key)}`,
+        })
+      } else {
+        oversized.push(label)
+      }
     }
   }
 }
 
-// Replace each <!-- treemap-links --> placeholder with the corresponding package's links
-let placeholderIdx = 0
-md = md.replace(/<!-- treemap-links -->/g, () => {
-  const pkg = packages[placeholderIdx++]
-  if (!pkg || (pkg.links.length === 0 && pkg.oversized.length === 0)) return ''
+let totalEmbedSize = embeds.reduce(
+  (sum, embed) => sum + embed.encoded.length + embed.key.length + 25,
+  0,
+)
+for (const embed of [...embeds].sort((left, right) => right.encoded.length - left.encoded.length)) {
+  if (markdown.length + totalEmbedSize <= MAX_COMMENT_BODY) break
+  const embedIndex = embeds.indexOf(embed)
+  if (embedIndex >= 0) embeds.splice(embedIndex, 1)
+  totalEmbedSize -= embed.encoded.length + embed.key.length + 25
+  const exportParameter = encodeURIComponent(embed.key)
+  const linkIndex = links.findIndex((link) => link.url.includes(`export=${exportParameter}`))
+  if (linkIndex >= 0) {
+    oversized.push(links[linkIndex].label)
+    links.splice(linkIndex, 1)
+  }
+}
 
+markdown = markdown.replace('<!-- treemap-links -->', formatLinks(links, oversized, runUrl))
+if (embeds.length > 0) {
+  markdown += '\n'
+  for (const embed of embeds) {
+    markdown += `\n<!-- treemap-data:${embed.key} ${embed.encoded} -->`
+  }
+}
+
+process.stdout.write(markdown)
+
+function formatLinks(
+  treemapLinks: TreemapLink[],
+  oversizedTreemaps: string[],
+  artifactUrl: string,
+): string {
   const parts: string[] = []
-
-  if (pkg.links.length > 0) {
-    const viewer =
-      pkg.links.length === 1
-        ? `[View treemap](${pkg.links[0].url})`
-        : pkg.links.map((l) => `[${BACKTICK}${l.label}${BACKTICK}](${l.url})`).join(' \u00b7 ')
-    parts.push(viewer)
+  if (treemapLinks.length === 1) {
+    parts.push(`[View treemap](${treemapLinks[0].url})`)
+  } else if (treemapLinks.length > 1) {
+    parts.push(
+      treemapLinks.map((link) => `[${BACKTICK}${link.label}${BACKTICK}](${link.url})`).join(' · '),
+    )
   }
-
-  if (pkg.oversized.length > 0) {
-    const label =
-      pkg.oversized.length === 1
-        ? `${BACKTICK}${pkg.oversized[0]}${BACKTICK} treemap too large to embed`
-        : `${pkg.oversized.length} treemaps too large to embed`
-    parts.push(label)
+  if (oversizedTreemaps.length === 1) {
+    parts.push(`${BACKTICK}${oversizedTreemaps[0]}${BACKTICK} is too large to embed`)
+  } else if (oversizedTreemaps.length > 1) {
+    parts.push(`${oversizedTreemaps.length} treemaps are too large to embed`)
   }
-
-  parts.push(`[Artifacts](${runUrl})`)
-
+  parts.push(`[Artifacts](${artifactUrl})`)
   return `🗺️ ${parts.join(' · ')}`
-})
-
-// Remove the now-redundant treemap artifact notes from inside <details>
-md = md.replaceAll(
-  '- Treemap artifacts are attached to the CI run for detailed size analysis\n',
-  '',
-)
-
-// Remove redundant standalone treemap artifact notes
-md = md.replaceAll(
-  '_Treemap artifacts are attached to the CI run for detailed size analysis._\n',
-  '',
-)
-
-// Append hidden data blocks for comment-embedded treemaps across all packages
-const remainingEmbeds = packages.flatMap((p) => p.embeds)
-if (remainingEmbeds.length > 0) {
-  md += '\n'
-  for (const embed of remainingEmbeds) {
-    md += `\n<!-- treemap-data:${embed.key} ${embed.encoded} -->`
-  }
 }
 
-process.stdout.write(md)
-
-/**
- * Extract the JSON string from a rollup-plugin-visualizer HTML file.
- * The data is embedded as `const data = <json>;\n`.
- */
 function extractTreemapJson(html: string): string | undefined {
   const marker = 'const data = '
-  const i = html.indexOf(marker)
-  if (i < 0) return undefined
-
-  const start = i + marker.length
+  const startMarker = html.indexOf(marker)
+  if (startMarker < 0) return undefined
+  const start = startMarker + marker.length
   const end = html.indexOf(';\n', start)
-  if (end < 0) return undefined
-
-  return html.substring(start, end)
+  return end < 0 ? undefined : html.substring(start, end)
 }
 
-/**
- * Parse treemap JSON and strip fields not used by the viewer to reduce payload size.
- *
- * Removes:
- * - `env` — never read by viewer
- * - `version` — never read by viewer
- * - `nodeParts[uid].brotliLength` — always 0 (brotli disabled in our config)
- * - `nodeMetas[uid].imported` — never read (only `importedBy` is used)
- * - `nodeMetas[uid].isEntry` — not read by viewer
- * - `nodeMetas[uid].isExternal` — not read by viewer
- */
 function compactTreemapData(json: string): string {
-  const data = JSON.parse(json)
+  const value: unknown = JSON.parse(json)
+  if (!isTreemapData(value)) return json
+  delete value.env
+  delete value.version
 
-  delete data.env
-  delete data.version
-
-  for (const uid in data.nodeParts) {
-    delete data.nodeParts[uid].brotliLength
+  for (const part of Object.values(value.nodeParts)) delete part.brotliLength
+  for (const metadata of Object.values(value.nodeMetas)) {
+    delete metadata.imported
+    delete metadata.isEntry
+    delete metadata.isExternal
+    if (typeof metadata.id === 'string') metadata.id = simplifyPnpmId(metadata.id)
   }
+  simplifyPnpmPaths(value.tree)
+  return JSON.stringify(value)
+}
 
-  for (const uid in data.nodeMetas) {
-    const meta = data.nodeMetas[uid]
-    delete meta.imported
-    delete meta.isEntry
-    delete meta.isExternal
-    if (typeof meta.id === 'string') {
-      meta.id = simplifyPnpmId(meta.id)
-    }
-  }
+interface TreemapPart {
+  brotliLength?: unknown
+}
 
-  simplifyPnpmPaths(data.tree)
-
-  return JSON.stringify(data)
+interface TreemapMetadata {
+  id?: unknown
+  imported?: unknown
+  isEntry?: unknown
+  isExternal?: unknown
 }
 
 interface TreeNode {
@@ -282,42 +187,46 @@ interface TreeNode {
   children?: TreeNode[]
 }
 
-/**
- * Simplify pnpm's verbose `.pnpm/<pkg+version_hash>/node_modules/<pkg>/...` paths
- * to just `<pkg>/...` so treemap labels are readable.
- */
+interface TreemapData {
+  env?: unknown
+  version?: unknown
+  nodeParts: Record<string, TreemapPart>
+  nodeMetas: Record<string, TreemapMetadata>
+  tree: TreeNode
+}
+
+function isTreemapData(value: unknown): value is TreemapData {
+  if (!isRecord(value) || !isRecord(value.nodeParts) || !isRecord(value.nodeMetas)) return false
+  return isTreeNode(value.tree)
+}
+
+function isTreeNode(value: unknown): value is TreeNode {
+  if (!isRecord(value) || typeof value.name !== 'string') return false
+  if (value.children === undefined) return true
+  return Array.isArray(value.children) && value.children.every(isTreeNode)
+}
+
 function simplifyPnpmPaths(node: TreeNode): void {
   if (!node.children) return
-
   for (const child of node.children) {
-    if (child.name === 'node_modules/.pnpm') {
-      simplifyPnpmChildren(child)
-    } else {
-      simplifyPnpmPaths(child)
-    }
+    if (child.name === 'node_modules/.pnpm') simplifyPnpmChildren(child)
+    else simplifyPnpmPaths(child)
   }
 }
 
-function simplifyPnpmChildren(pnpmNode: TreeNode): void {
-  if (!pnpmNode.children) return
-
-  for (const child of pnpmNode.children) {
-    const idx = child.name.indexOf('/node_modules/')
-    if (idx !== -1) {
-      child.name = child.name.slice(idx + '/node_modules/'.length)
-    }
+function simplifyPnpmChildren(node: TreeNode): void {
+  if (!node.children) return
+  for (const child of node.children) {
+    const index = child.name.indexOf('/node_modules/')
+    if (index !== -1) child.name = child.name.slice(index + '/node_modules/'.length)
   }
-
-  // Rename the parent from "node_modules/.pnpm" to just "node_modules"
-  // since the children now have clean package names
-  pnpmNode.name = 'node_modules'
+  node.name = 'node_modules'
 }
 
-/**
- * Simplify pnpm paths in nodeMeta `id` strings.
- * `/node_modules/.pnpm/<hash>/node_modules/@sanity/ui/dist/theme.mjs`
- * becomes `/node_modules/@sanity/ui/dist/theme.mjs`
- */
 function simplifyPnpmId(id: string): string {
   return id.replace(PNPM_PATH_RE, '/node_modules/')
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }

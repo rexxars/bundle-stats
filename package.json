@@ -1,7 +1,7 @@
 {
   "name": "@rexxars/bundle-stats",
   "version": "1.11.4",
-  "description": "Measure bundle sizes, bundled-with-deps sizes, and import times for package exports",
+  "description": "Measure and compare ESM bundle scenarios with Rolldown",
   "license": "MIT",
   "author": "Espen Hovlandsdal <espen@hovlandsdal.com>",
   "repository": {
@@ -21,8 +21,12 @@
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./config": {
+      "types": "./dist/config.d.ts",
+      "import": "./dist/config.js"
     },
     "./package.json": "./package.json"
   },
@@ -31,32 +35,30 @@
     "bin/bundle-stats.js"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsdown",
+    "changeset": "changeset",
     "check:types": "tsc --noEmit",
     "check:format": "prettier --check .",
     "format": "prettier --write .",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "test": "node --test src/**/*.test.ts",
+    "test": "node --test 'src/**/*.test.ts'",
     "knip": "knip",
     "build:viewer": "node scripts/build-viewer.ts",
-    "prepublishOnly": "tsup"
+    "prepublishOnly": "tsdown"
   },
   "dependencies": {
-    "@rollup/plugin-commonjs": "^28.0.3",
-    "@rollup/plugin-json": "^6.1.0",
-    "@rollup/plugin-node-resolve": "^16.0.3",
-    "prettier": "^3.5.3",
-    "rollup": "^4.34.0",
+    "rolldown": "^1.2.5",
     "rollup-plugin-visualizer": "^5.14.0"
   },
   "devDependencies": {
-    "@sanity/semantic-release-preset": "^6.0.0",
+    "@changesets/cli": "^3.0.1",
     "@types/node": "^24.0.0",
     "eslint": "^9.28.0",
     "knip": "^5.85.0",
-    "semantic-release": "^25.0.3",
-    "tsup": "^8.5.0",
+    "prettier": "^3.5.3",
+    "publint": "^0.3.24",
+    "tsdown": "^0.22.14",
     "typescript": "^5.8.2",
     "typescript-eslint": "^8.33.0"
   },

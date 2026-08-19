@@ -1,130 +1,65 @@
-import {describe, it, beforeEach, afterEach} from 'node:test'
 import assert from 'node:assert/strict'
-import {mkdtempSync, writeFileSync, mkdirSync, rmSync} from 'node:fs'
-import {join} from 'node:path'
+import {existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync} from 'node:fs'
 import {tmpdir} from 'node:os'
+import {join} from 'node:path'
+import {test} from 'node:test'
 
-import {generateReport} from './index.ts'
+import {resolveConfig} from './config.ts'
+import {measure} from './index.ts'
 
-describe('generateReport entry discovery errors', () => {
-  let tempDir: string
-
-  beforeEach(() => {
-    tempDir = mkdtempSync(join(tmpdir(), 'bundle-stats-test-'))
-  })
-
-  afterEach(() => {
-    rmSync(tempDir, {recursive: true, force: true})
-  })
-
-  it('mentions the active filters when all entries are excluded by --only', async () => {
-    mkdirSync(join(tempDir, 'dist'), {recursive: true})
-    writeFileSync(join(tempDir, 'dist', '_internal.js'), 'export default 42')
+test('measures exports and consumer entries with Rolldown', async () => {
+  const root = mkdtempSync(join(tmpdir(), 'bundle-stats-measure-'))
+  try {
+    mkdirSync(join(root, 'dist'))
+    mkdirSync(join(root, 'checks'))
     writeFileSync(
-      join(tempDir, 'package.json'),
+      join(root, 'package.json'),
       JSON.stringify({
-        name: '@scope/has-only-subpath',
+        name: 'fixture',
         version: '1.0.0',
-        exports: {
-          './_internal': './dist/_internal.js',
-          './package.json': './package.json',
-        },
+        type: 'module',
+        exports: {'.': './dist/index.js'},
       }),
     )
-
-    await assert.rejects(
-      () =>
-        generateReport({
-          packagePath: tempDir,
-          ignorePatterns: [],
-          onlyPatterns: ['.'],
-          conditions: [],
-          noBenchmark: true,
-          noBundle: true,
-          noBinBenchmark: true,
-          allowBinChildProcess: false,
-          outdir: tempDir,
-        }),
-      (err: unknown) => {
-        if (!(err instanceof Error)) return false
-        return (
-          err.message.includes('@scope/has-only-subpath') &&
-          err.message.includes('--only=.') &&
-          err.message.includes('matched the active filters')
-        )
-      },
-    )
-  })
-
-  it('mentions both --only and --ignore when both filters are active', async () => {
-    mkdirSync(join(tempDir, 'dist'), {recursive: true})
-    writeFileSync(join(tempDir, 'dist', 'index.js'), 'export default 42')
     writeFileSync(
-      join(tempDir, 'package.json'),
-      JSON.stringify({
-        name: '@scope/all-filtered',
-        version: '1.0.0',
-        exports: {
-          '.': './dist/index.js',
-        },
-      }),
+      join(root, 'dist/index.js'),
+      'export const small = 1\nexport const large = "x".repeat(1000)\n',
     )
-
-    await assert.rejects(
-      () =>
-        generateReport({
-          packagePath: tempDir,
-          ignorePatterns: ['.'],
-          onlyPatterns: ['.'],
-          conditions: [],
-          noBenchmark: true,
-          noBundle: true,
-          noBinBenchmark: true,
-          allowBinChildProcess: false,
-          outdir: tempDir,
-        }),
-      (err: unknown) => {
-        if (!(err instanceof Error)) return false
-        return err.message.includes('--only=.') && err.message.includes('--ignore=.')
-      },
-    )
-  })
-
-  it('falls back to the generic message when no filters are active', async () => {
-    // exports map present but contains only ./package.json (auto-skipped), no bin
     writeFileSync(
-      join(tempDir, 'package.json'),
-      JSON.stringify({
-        name: '@scope/no-entries',
-        version: '1.0.0',
-        exports: {
-          './package.json': './package.json',
-        },
-      }),
+      join(root, 'checks/small.ts'),
+      "import {small} from '../dist/index.js'\nconsole.log(small)\n",
     )
 
-    await assert.rejects(
-      () =>
-        generateReport({
-          packagePath: tempDir,
-          ignorePatterns: [],
-          onlyPatterns: [],
-          conditions: [],
-          noBenchmark: true,
-          noBundle: true,
-          noBinBenchmark: true,
-          allowBinChildProcess: false,
-          outdir: tempDir,
-        }),
-      (err: unknown) => {
-        if (!(err instanceof Error)) return false
-        return (
-          err.message.includes('@scope/no-entries') &&
-          err.message.includes('No measurable') &&
-          !err.message.includes('--only') &&
-          !err.message.includes('--ignore')
-        )
+    const config = resolveConfig(
+      {
+        packages: [
+          {
+            root: '.',
+            scenarios: {bins: false, entries: {small: './checks/small.ts'}},
+            importTime: false,
+          },
+        ],
+        concurrency: 2,
+        outdir: './artifacts',
       },
+      root,
+      null,
     )
-  })
+    const report = await measure(config)
+
+    assert.equal(report.engine.name, 'rolldown')
+    assert.deepEqual(
+      report.packages[0].scenarios.map((scenario) => scenario.scenario.id),
+      ['export:.', 'consumer:small'],
+    )
+    for (const scenario of report.packages[0].scenarios) {
+      assert.ok(scenario.bundle)
+      assert.ok(scenario.bundle.rawBytes > 0)
+      assert.ok(scenario.bundle.treemapPath)
+      assert.equal(existsSync(scenario.bundle.treemapPath), true)
+      assert.deepEqual(scenario.diagnostics, [])
+    }
+  } finally {
+    rmSync(root, {recursive: true})
+  }
 })
