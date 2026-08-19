@@ -1,5 +1,15 @@
 <!-- markdownlint-disable --><!-- textlint-disable -->
 
+## 2.0.0
+
+### Major Changes
+
+- fc60b16: Rewrite bundle-stats around an ESM-only config and scenario API. Measurement now uses Rolldown with bounded concurrency, supports named consumer entries, separates measurement from comparison, and keeps insignificant changes in collapsed report details.
+
+### Patch Changes
+
+- f758dcd: Treat consumer entries that are absent from the baseline as added scenarios. Their change columns now show `N/A` instead of `None`, and reports no longer show the missing baseline file as a measurement error.
+
 # 📓 Changelog
 
 All notable changes to this project will be documented in this file. See

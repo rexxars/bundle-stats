@@ -1,6 +1,6 @@
 {
   "name": "@rexxars/bundle-stats",
-  "version": "1.11.4",
+  "version": "2.0.0",
   "description": "Measure and compare ESM bundle scenarios with Rolldown",
   "license": "MIT",
   "author": "Espen Hovlandsdal <espen@hovlandsdal.com>",
