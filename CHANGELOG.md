@@ -1,5 +1,11 @@
 <!-- markdownlint-disable --><!-- textlint-disable -->
 
+## 2.0.1
+
+### Patch Changes
+
+- dd8ffd8: Minify bundles and remove comments before measuring gzip size. Raw bundle sizes remain unminified. Regenerate saved baselines to compare gzip sizes with the same measurement method.
+
 ## 2.0.0
 
 ### Major Changes
