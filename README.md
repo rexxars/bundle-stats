@@ -102,7 +102,7 @@ Run `bundle-stats --help` for all command options.
 - Export scenarios bundle each concrete ESM subpath in `package.json#exports`.
 - Consumer scenarios bundle a named JavaScript or TypeScript input file.
 - Bin scenarios bundle each ESM entry in `package.json#bin`.
-- Bundle measurements include raw bytes, gzip bytes, and an HTML treemap.
+- Bundle measurements include raw bytes, gzip bytes, and an HTML treemap. Raw bytes measure the unminified bundle. Gzip bytes measure the bundle after minification with Rolldown and removal of all comments, including license comments. The treemap shows unminified module sizes.
 - Import measurements use isolated Node.js processes and report the trimmed median.
 - Peer dependencies and native `.node` addons stay external.
 

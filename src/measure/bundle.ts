@@ -5,6 +5,7 @@ import {resolve} from 'node:path'
 import {gzipSync} from 'node:zlib'
 
 import {rolldown} from 'rolldown'
+import {minifySync} from 'rolldown/utils'
 import {visualizer} from 'rollup-plugin-visualizer'
 
 import type {BundlePlatform, BundleResult, Scenario} from '../types.ts'
@@ -51,10 +52,19 @@ export async function measureBundle(options: BundleOptions): Promise<BundleResul
       .filter((output) => output.type === 'chunk')
       .map((output) => output.code)
       .join('\n')
+    const minified = minifySync('bundle.mjs', code, {
+      module: true,
+      codegen: {legalComments: 'none'},
+    })
+    if (minified.errors.length > 0) {
+      throw new Error(
+        `Failed to minify bundle: ${minified.errors.map((error) => error.message).join('\n')}`,
+      )
+    }
 
     return {
       rawBytes: Buffer.byteLength(code, 'utf8'),
-      gzipBytes: gzipSync(code).length,
+      gzipBytes: gzipSync(minified.code).length,
       treemapPath,
     }
   } finally {
